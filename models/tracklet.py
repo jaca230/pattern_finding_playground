@@ -1,7 +1,7 @@
 from typing import List, Optional, Callable
-from hit import Hit
-from particle_mapping import particle_name_map  # Make sure this is the correct import
-from point_3d import Point3D  # Make sure this import is correct
+from models.hit import Hit
+from utils.particle_mapping import particle_name_map  # Make sure this is the correct import
+from models.point_3d import Point3D  # Make sure this import is correct
 
 
 class Tracklet:

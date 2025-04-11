@@ -1,7 +1,7 @@
 # event_patterns.py
 
 from typing import Set
-from pattern import Pattern
+from models.pattern import Pattern
 
 
 class EventPatterns:

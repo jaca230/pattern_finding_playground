@@ -1,7 +1,7 @@
 # pattern.py
 
 from typing import Set
-from vertex import Vertex
+from models.vertex import Vertex
 
 
 class Pattern:

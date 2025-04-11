@@ -2,10 +2,10 @@ import os
 from datetime import datetime
 import numpy as np
 from typing import List, Tuple, Set, Optional
-from point_3d import Point3D
-from tracklet import Tracklet
-from vertex import Vertex
-from hit import Hit
+from models.point_3d import Point3D
+from models.tracklet import Tracklet
+from models.vertex import Vertex
+from models.hit import Hit
 
 def print_file_creation_time(file_name):
     """Print the creation time of a file."""
@@ -115,8 +115,8 @@ def fit_tracklet_hits(hits: List[Hit]) -> dict:
             "b": None, 
             "unc_m": None, 
             "unc_b": None,
-            "y_min": 0,
-            "y_max": 0
+            "y_min": None,
+            "y_max": None
         }
 
     # Handle front hits
@@ -154,60 +154,8 @@ def fit_tracklet_hits(hits: List[Hit]) -> dict:
             "b": None, 
             "unc_m": None, 
             "unc_b": None,
-            "x_min": 0,
-            "x_max": 0
+            "x_min": None,
+            "x_max": None
         }
 
     return fit_results
-
-
-
-def determine_endpoints(tracklet: Tracklet) -> tuple[Optional[Point3D], Optional[Point3D]]:
-    """Determines the endpoints of a tracklet based on the fit results and stores the endpoints."""
-    
-    # Apply the fitting function
-    tracklet.fitter = fit_tracklet_hits  # Assign the fitting function
-    tracklet.fit()  # Fit the tracklet using the fitter
-    
-    # Get the fitted y_min, y_max for back hits and x_min, x_max for front hits from fit_results
-    y_min = tracklet.fit_results.get("y_z_fit", {}).get("y_min", 0)
-    y_max = tracklet.fit_results.get("y_z_fit", {}).get("y_max", 0)
-    
-    x_min = tracklet.fit_results.get("x_z_fit", {}).get("x_min", 0)
-    x_max = tracklet.fit_results.get("x_z_fit", {}).get("x_max", 0)
-    
-    # Get the min and max z values from fit_results
-    min_z = tracklet.fit_results.get("min_z", 0)
-    max_z = tracklet.fit_results.get("max_z", 0)
-
-    # Create the endpoints using the fitted values and the z values from the fit results
-    endpoint_0 = Point3D(x_min, y_min, min_z)
-    endpoint_1 = Point3D(x_max, y_max, max_z)
-
-    # Set the endpoints in the tracklet
-    tracklet.set_endpoints(endpoint_0, endpoint_1)
-
-    return endpoint_0, endpoint_1
-
-
-
-
-
-
-
-
-def form_vertices(tracklets: Set[Tracklet]) -> Set[Vertex]:
-    vertices = set()
-    
-    # First pass: Determine endpoints for each tracklet
-    for tracklet in tracklets:
-        endpoint_0, endpoint_1 = determine_endpoints(tracklet)
-        tracklet.set_endpoints(endpoint_0, endpoint_1)
-
-    # Second pass: Create vertices based on endpoint distances
-    for index, tracklet in enumerate(tracklets):
-        # Create a vertex using the index as the vertex_id
-        vertex = Vertex(seed_tracklet=tracklet, vertex_id=index)
-
-        
-    return vertices

@@ -1,5 +1,5 @@
 from typing import Optional
-from particle_mapping import particle_name_map  # Assuming this file is named particle_mapping.py
+from utils.particle_mapping import particle_name_map  # Assuming this file is named particle_mapping.py
 
 class Hit:
     def __init__(
