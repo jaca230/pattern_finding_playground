@@ -1,17 +1,19 @@
-from typing import Set
+from typing import Set, Optional
 from models.vertex import Vertex
 from models.tracklet import Tracklet
 
-
 class Pattern:
-    def __init__(self, vertices: Set[Vertex]):
+    def __init__(self, pattern_id: int, vertices: Optional[Set[Vertex]] = None):
         """
         Represents a full event-level pattern composed of vertices.
 
         Args:
-            vertices: A set of Vertex objects that make up the pattern.
+            pattern_id: A unique identifier for the pattern.
+            vertices: An optional set of Vertex objects that make up the pattern.
         """
-        self.vertices = vertices
+        self.pattern_id = pattern_id
+        self.vertices: Set[Vertex] = vertices if vertices is not None else set()
+        self.extra_info: dict = {}
 
     def get_vertices(self) -> Set[Vertex]:
         """Returns the set of vertices in the pattern."""
@@ -29,4 +31,4 @@ class Pattern:
         return unique_tracklets
 
     def __repr__(self) -> str:
-        return f"Pattern(num_vertices={len(self.vertices)})"
+        return f"Pattern(id={self.pattern_id}, num_vertices={len(self.vertices)})"

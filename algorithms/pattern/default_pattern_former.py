@@ -16,13 +16,17 @@ class DefaultPatternFormer(PatternFormer):
         """
         patterns = set()
         unvisited = set(vertices)
+        pattern_id = 0  # Start pattern ID counter
 
-        while unvisited: #Visit each vertex in the set exactly once
-            start = unvisited.pop() # start at some vertex in the set
-            component = self._dfs(start, unvisited) # find all connected vertices  
-            patterns.add(Pattern(component)) # add the connected component as a pattern
+        while unvisited:  # Visit each vertex in the set exactly once
+            start = unvisited.pop()  # start at some vertex in the set
+            component = self._dfs(start, unvisited)  # find all connected vertices
+            patterns.add(Pattern(pattern_id, component))  # add the connected component as a pattern
+            pattern_id += 1
 
-        return patterns
+        result_info = {}
+
+        return patterns, result_info
 
     def _dfs(self, start: Vertex, unvisited: Set[Vertex]) -> Set[Vertex]:
         """Performs depth-first search to find all vertices connected to 'start'."""

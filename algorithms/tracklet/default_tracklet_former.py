@@ -1,23 +1,10 @@
-from typing import Set, List
-from models.hit import Hit
+from typing import List, Any
 from models.tracklet import Tracklet
-from models.vertex import Vertex
-from models.pattern import Pattern
-from algorithms.vertex.vertex_former import VertexFormer
-from algorithms.pattern.pattern_former import PatternFormer
+from models.hit import Hit
+from algorithms.tracklet.tracklet_former import TrackletFormer  # your abstract base
 
-class PatternFindingHelpers:
-    def __init__(self, vertex_former: VertexFormer, pattern_former: PatternFormer):
-        self.vertex_former = vertex_former
-        self.pattern_former = pattern_former
-
-    def form_vertices(self, tracklets: Set[Tracklet]) -> Set[Vertex]:
-        return self.vertex_former.form_vertices(tracklets)
-
-    def form_patterns(self, vertices: Set[Vertex]) -> Set[Pattern]:
-        return self.pattern_former.form_patterns(vertices)
-
-    def create_tracklets(self, file, entry_index: int) -> List[Tracklet]:
+class DefaultTrackletFormer(TrackletFormer):
+    def form_tracklets(self, file: Any, entry_index: int) -> List[Tracklet]:
         tree = file.Get("rec")
         geoHelper = file.Get("PIMCGeoHelper")
         tree.GetEntry(entry_index)
@@ -67,4 +54,6 @@ class PatternFindingHelpers:
                     hits=hits
                 ))
 
-        return tracklets
+        result_info = {}
+
+        return tracklets, result_info

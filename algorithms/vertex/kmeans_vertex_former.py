@@ -162,15 +162,15 @@ class KMeansVertexFormer(VertexFormer):
         tracklet.fit()  # Fit the tracklet using the fitter
         
         # Get the fitted y_min, y_max for back hits and x_min, x_max for front hits from fit_results
-        y_min = tracklet.fit_results.get("y_z_fit", {}).get("y_min", None)
-        y_max = tracklet.fit_results.get("y_z_fit", {}).get("y_max", None)
+        y_min = tracklet.get_fit_results().get("y_z_fit", {}).get("y_min", None)
+        y_max = tracklet.get_fit_results().get("y_z_fit", {}).get("y_max", None)
         
-        x_min = tracklet.fit_results.get("x_z_fit", {}).get("x_min", None)
-        x_max = tracklet.fit_results.get("x_z_fit", {}).get("x_max", None)
+        x_min = tracklet.get_fit_results().get("x_z_fit", {}).get("x_min", None)
+        x_max = tracklet.get_fit_results().get("x_z_fit", {}).get("x_max", None)
         
         # Get the min and max z values from fit_results
-        min_z = tracklet.fit_results.get("min_z", None)
-        max_z = tracklet.fit_results.get("max_z", None)
+        min_z = tracklet.get_fit_results().get("min_z", None)
+        max_z = tracklet.get_fit_results().get("max_z", None)
 
         # Create the endpoints using the fitted values and the z values from the fit results
         endpoint_0 = Point3D(x_min, y_min, min_z)
@@ -182,14 +182,13 @@ class KMeansVertexFormer(VertexFormer):
         return endpoint_0, endpoint_1
 
 
-    def form_vertices(self, tracklets: Set[Tracklet]) -> Set[Vertex]:
+    def form_vertices(self, tracklets: Set[Tracklet]) -> tuple[Set[Vertex], dict]:
         """Find vertices for the given set of tracklets using the constrained k-means algorithm."""
-        
-        tracklets = list(tracklets)  # Convert the set to a list for indexing
+
+        tracklets = list(tracklets)
         front_endpoints = []
         back_endpoints = []
 
-        # Gather endpoints for each tracklet
         for tracklet in tracklets:
             endpoint_0, endpoint_1 = self.determine_endpoints(tracklet)
 
@@ -214,88 +213,61 @@ class KMeansVertexFormer(VertexFormer):
             if tracklet_back_endpoints:
                 back_endpoints.append(tracklet_back_endpoints)
 
-        # Run constrained k-means to find the clusters
+        # Run constrained k-means clustering
         min_BIC_f, min_k_f, centroids_f, vertex_endpoint_map_f = self.constrained_k_means(front_endpoints, n_iters=self.n_iters, sigma=self.sigma)
         min_BIC_b, min_k_b, centroids_b, vertex_endpoint_map_b = self.constrained_k_means(back_endpoints, n_iters=self.n_iters, sigma=self.sigma)
 
-        # Group tracklets by the cluster each endpoint belongs to
         front_vertex_to_tracklets = defaultdict(set)
         back_vertex_to_tracklets = defaultdict(set)
 
-        # For the front endpoints, group tracklets by vertex index
         for i, vertex_indices in enumerate(vertex_endpoint_map_f):
             for v_idx in vertex_indices:
                 front_vertex_to_tracklets[v_idx].add(tracklets[i])
 
-        # For the back endpoints, group tracklets by vertex index
         for i, vertex_indices in enumerate(vertex_endpoint_map_b):
             for v_idx in vertex_indices:
                 back_vertex_to_tracklets[v_idx].add(tracklets[i])
 
-        # Create vertices from the tracklets grouped by clusters
         vertices_f = set()
         vertices_b = set()
 
-        # Create Vertex objects for the front
         for v_idx, tracklets_set in front_vertex_to_tracklets.items():
             vertex = Vertex(vertex_id=v_idx)
             for tracklet in tracklets_set:
                 vertex.add_tracklet(tracklet)
-            vertex.tracklet_former_results = {
-                "front": {
-                    "min_BIC": min_BIC_f,
-                    "min_k": min_k_f,
-                    "centroid": centroids_f[v_idx],
-                },
-                "back": {
-                    "min_BIC": min_BIC_b,
-                    "min_k": min_k_b,
-                    "centroid": centroids_b[v_idx],
-                }
-            }
             vertices_f.add(vertex)
 
-        # Create Vertex objects for the back
         for v_idx, tracklets_set in back_vertex_to_tracklets.items():
             vertex = Vertex(vertex_id=v_idx)
             for tracklet in tracklets_set:
                 vertex.add_tracklet(tracklet)
-            vertex.tracklet_former_results = {
-                "front": {
-                    "min_BIC": min_BIC_f,
-                    "min_k": min_k_f,
-                    "centroid": centroids_f[v_idx],
-                },
-                "back": {
-                    "min_BIC": min_BIC_b,
-                    "min_k": min_k_b,
-                    "centroid": centroids_b[v_idx],
-                }
-            }
             vertices_b.add(vertex)
 
+        # Vertex set comparison logic
+        result_info = {}
+        result_info["vertex_comparison"] = {
+            "only_in_front": vertices_f - vertices_b,
+            "only_in_back": vertices_b - vertices_f,
+            "match": vertices_f == vertices_b,
+        }
 
-        # Final comparison
-        if vertices_f != vertices_b:
-            print("⚠️ Warning: Front and back vertex sets do not match!")
+        # Store BIC and k values in the result map
+        result_info["stats"] = {
+            "front": {
+                "BIC": min_BIC_f,
+                "k": min_k_f,
+                "centroids": centroids_f,
+            },
+            "back": {
+                "BIC": min_BIC_b,
+                "k": min_k_b,
+                "centroids": centroids_b,
+            }
+        }
 
-            only_in_front = vertices_f - vertices_b
-            only_in_back = vertices_b - vertices_f
-
-            if only_in_front:
-                print("🟦 Vertices only in front:")
-                for v in only_in_front:
-                    tracklet_ids = [t.tracklet_id for t in v.get_tracklets()]
-                    print(f"  Vertex ID {v.vertex_id}: Tracklet IDs {tracklet_ids}")
-
-            if only_in_back:
-                print("🟥 Vertices only in back:")
-                for v in only_in_back:
-                    tracklet_ids = [t.tracklet_id for t in v.get_tracklets()]
-                    print(f"  Vertex ID {v.vertex_id}: Tracklet IDs {tracklet_ids}")
+        return vertices_f, result_info
 
 
-        return vertices_f
 
 
 

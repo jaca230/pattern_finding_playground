@@ -12,8 +12,6 @@ class Tracklet:
         e_id: int,
         hits: List[Hit],
         fitter: Optional[Callable[[List[Hit]], dict]] = None,
-        is_incoming: Optional[bool] = None,
-        delta_r: Optional[float] = None,
         endpoint_0: Optional[Point3D] = None,
         endpoint_1: Optional[Point3D] = None
     ):
@@ -23,11 +21,9 @@ class Tracklet:
         self.hits = hits
         self.particle_name, self.particle_color = self.get_particle_info(particle_id)
         self.fitter = fitter
-        self.is_incoming = is_incoming
-        self.delta_r = delta_r
         self.endpoint_0 = endpoint_0
         self.endpoint_1 = endpoint_1
-        self.fit_results: Optional[dict] = {}
+        self.extra_info: dict = {}  # <-- general-purpose storage
 
     def get_particle_info(self, particle_id: int):
         """Retrieves the particle name and color based on the particle ID."""
@@ -55,19 +51,26 @@ class Tracklet:
         """Applies the fitting function to the hits and stores the results."""
         if not self.fitter:
             raise RuntimeError("No fitter function provided.")
-        self.fit_results = self.fitter(self.hits)
-        return self.fit_results
+        fit_result = self.fitter(self.hits)
+        self.extra_info['fit_results'] = fit_result
+        return fit_result
+
+    def get_fit_results(self) -> Optional[dict]:
+        """Returns the fit results if they exist."""
+        return self.extra_info.get("fit_results")
+
 
     def __repr__(self) -> str:
         endpoint_repr = (
             f", endpoints=({repr(self.endpoint_0)}, {repr(self.endpoint_1)})"
             if self.endpoint_0 and self.endpoint_1 else ""
         )
+        extra_info_keys = list(self.extra_info.keys()) if self.extra_info else None
         return (
             f"Tracklet(id={self.tracklet_id}, particle_id={self.particle_id}, "
             f"name={self.particle_name}, color={self.particle_color}, "
             f"e_id={self.e_id}, hits={len(self.hits)}, "
-            f"is_incoming={self.is_incoming}, delta_r={self.delta_r}, "
-            f"fit_keys={list(self.fit_results.keys()) if self.fit_results else None}"
+            f"extra_info_keys={extra_info_keys}"
             f"{endpoint_repr})"
         )
+

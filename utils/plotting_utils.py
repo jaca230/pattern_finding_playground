@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.colors as mcolors  # Correct import for color handling
+from models.event_patterns import EventPatterns
 
 def darken_color(color: str, factor: float = 0.6) -> str:
     """Darken the color by the given factor (default is 50%)."""
@@ -8,7 +9,12 @@ def darken_color(color: str, factor: float = 0.6) -> str:
     darkened_color = np.clip(color * factor, 0, 1)  # Scale and clip to valid range
     return mcolors.rgb2hex(darkened_color)  # Convert back to hex using matplotlib.colors
 
-def plot_tracklets(tracklets, vertices=None):
+def plot_event(event_patterns: EventPatterns):
+    # Get all unique tracklets from the EventPatterns
+    tracklets = set()
+    for pattern in event_patterns.get_patterns():
+        tracklets.update(pattern.get_unique_tracklets())
+
     # Create a figure with 3 subplots (1 row, 3 columns)
     fig, ax = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
 
@@ -66,27 +72,34 @@ def plot_tracklets(tracklets, vertices=None):
             ax[1].plot([endpoint_0.z, endpoint_1.z], [endpoint_0.y, endpoint_1.y], color=dark_particle_color, linestyle='-', linewidth=3, alpha=0.7)
 
         plotted_particles.add(tracklet.particle_name)
+    
+    # Check if the extra info contains vertex algorithm data
+    if 'vertex_algorithm_info' in event_patterns.extra_info:
+        vertex_algorithm_info = event_patterns.extra_info['vertex_algorithm_info']
 
-    # Plot centroids from vertices, if provided
-    if vertices is not None:
-        for vertex in vertices:
-            # Plot front centroid on x-z plane (subplot 0)
-            if 'front' in vertex.tracklet_former_results and 'centroid' in vertex.tracklet_former_results['front']:
-                front_centroid = vertex.tracklet_former_results['front']['centroid']
-                ax[0].scatter(
-                    front_centroid[2], front_centroid[0],
-                    color='magenta', edgecolors='black', marker='X',
-                    s=150, linewidths=1.5, zorder=15, label='Front Centroid'
-                )
+        # Check if the stats for vertices contain centroid data
+        if 'stats' in vertex_algorithm_info:
+            stats = vertex_algorithm_info['stats']
 
-            # Plot back centroid on y-z plane (subplot 1)
-            if 'back' in vertex.tracklet_former_results and 'centroid' in vertex.tracklet_former_results['back']:
-                back_centroid = vertex.tracklet_former_results['back']['centroid']
-                ax[1].scatter(
-                    back_centroid[2], back_centroid[1],
-                    color='magenta', edgecolors='black', marker='X',
-                    s=150, linewidths=1.5, zorder=15, label='Back Centroid'
-                )
+            if 'front' in stats and 'centroids' in stats['front']:
+                front_centroids = stats['front']['centroids']
+                for centroid in front_centroids:
+                    ax[0].scatter(
+                        centroid[2], centroid[0],
+                        color='magenta', edgecolors='black', marker='X',
+                        s=150, linewidths=1.5, zorder=15, label='Front Centroid'
+                    )
+            if 'back' in stats and 'centroids' in stats['back']:
+                back_centroids = stats['back']['centroids']
+                for centroid in back_centroids:
+                    ax[1].scatter(
+                        centroid[2], centroid[1],
+                        color='magenta', edgecolors='black', marker='X',
+                        s=150, linewidths=1.5, zorder=15, label='Back Centroid'
+                    )
+
+
+
 
     # Set log scale for energy plot
     ax[2].set_yscale('log')
