@@ -36,7 +36,8 @@ class Stage(Enum):
 
 
 class EventPatterns:
-    def __init__(self, tracklet_former: TrackletFormer, vertex_former: VertexFormer, pattern_former: PatternFormer):
+    def __init__(self, event_id: int, tracklet_former: TrackletFormer, vertex_former: VertexFormer, pattern_former: PatternFormer):
+        self.event_id = event_id
         self.tracklet_former = tracklet_former
         self.vertex_former = vertex_former
         self.pattern_former = pattern_former
