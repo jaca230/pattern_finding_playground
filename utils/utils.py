@@ -6,6 +6,7 @@ from models.point_3d import Point3D
 from models.tracklet import Tracklet
 from models.vertex import Vertex
 from models.hit import Hit
+from models.event_patterns import EventPatterns
 
 def print_file_creation_time(file_name):
     """Print the creation time of a file."""
@@ -57,105 +58,63 @@ def linear_fit(x: List[float], y: List[float]) -> Tuple[float, float, float, flo
 
 def fit_tracklet_hits(hits: List[Hit]) -> dict:
     """
-    This function takes a list of hits, performs the fit for both front and back hits, 
-    and returns the fit results as a dictionary.
+    Perform linear fits for hits in both detector sides and return the results.
     
     Args:
         hits: List of Hit objects.
         
     Returns:
-        Dictionary containing the fit results.
+        Dictionary containing fit results for x(z) and y(z).
     """
+
     # Separate hits by detector side
     front_hits = [hit for hit in hits if hit.detector_side == 'front']
     back_hits = [hit for hit in hits if hit.detector_side == 'back']
 
-    # Get the min and max z values (used for both front and back hits)
+    # Get the min and max z values across all hits
     min_z = min(hit.z for hit in hits)
     max_z = max(hit.z for hit in hits)
 
-    # Initialize fit results dictionary
     fit_results = {
         "min_z": min_z,
         "max_z": max_z
     }
 
-    # Handle back hits
-    if len(back_hits) >= 2:
-        X_to_fit = [hit.z for hit in back_hits]
-        Y_to_fit = [hit.y for hit in back_hits]
-        m, b, unc_m, unc_b = linear_fit(X_to_fit, Y_to_fit)
+    # Back hits (Y vs Z)
+    back_zs = [hit.z for hit in back_hits]
+    back_ys = [hit.y for hit in back_hits]
+    if len(set(back_zs)) > 1: #at least 2 unique z values
+        m, b, unc_m, unc_b = linear_fit(back_zs, back_ys)
         y_min = m * min_z + b
         y_max = m * max_z + b
-        fit_results['y_z_fit'] = {
-            "m": m, 
-            "b": b, 
-            "unc_m": unc_m, 
-            "unc_b": unc_b,
-            "y_min": y_min,
-            "y_max": y_max
-        }
+    elif len(back_zs) > 0: # not 2 unique z values, but at least 1 hit
+        m = b = unc_m = unc_b = None
+        y_val = np.mean(back_ys)
+        y_min = y_max = y_val
+    else: # no hits
+        m = b = unc_m = unc_b = y_min = y_max = None
+    fit_results['y_z_fit'] = {
+        "m": m, "b": b, "unc_m": unc_m, "unc_b": unc_b,
+        "y_min": y_min, "y_max": y_max
+    }
 
-    elif len(back_hits) == 1:
-        y_min = back_hits[0].y
-        y_max = back_hits[0].y
-        fit_results['y_z_fit'] = {
-            "m": None, 
-            "b": None, 
-            "unc_m": None, 
-            "unc_b": None,
-            "y_min": y_min,
-            "y_max": y_max
-        }
-
-    else:
-        # No back hits, use default values
-        fit_results['y_z_fit'] = {
-            "m": None, 
-            "b": None, 
-            "unc_m": None, 
-            "unc_b": None,
-            "y_min": None,
-            "y_max": None
-        }
-
-    # Handle front hits
-    if len(front_hits) >= 2:
-        X_to_fit = [hit.z for hit in front_hits]
-        Y_to_fit = [hit.x for hit in front_hits]
-        m, b, unc_m, unc_b = linear_fit(X_to_fit, Y_to_fit)
+    # Front hits (X vs Z)
+    front_zs = [hit.z for hit in front_hits]
+    front_xs = [hit.x for hit in front_hits]
+    if len(set(front_zs)) > 1: #at least 2 unique z values
+        m, b, unc_m, unc_b = linear_fit(front_zs, front_xs)
         x_min = m * min_z + b
         x_max = m * max_z + b
-        fit_results['x_z_fit'] = {
-            "m": m, 
-            "b": b, 
-            "unc_m": unc_m, 
-            "unc_b": unc_b,
-            "x_min": x_min,
-            "x_max": x_max
-        }
-
-    elif len(front_hits) == 1:
-        x_min = front_hits[0].x
-        x_max = front_hits[0].x
-        fit_results['x_z_fit'] = {
-            "m": None, 
-            "b": None, 
-            "unc_m": None, 
-            "unc_b": None,
-            "x_min": x_min,
-            "x_max": x_max
-        }
-
-    else:
-        # No front hits, use default values
-        fit_results['x_z_fit'] = {
-            "m": None, 
-            "b": None, 
-            "unc_m": None, 
-            "unc_b": None,
-            "x_min": None,
-            "x_max": None
-        }
+    elif len(front_zs) > 0: # not 2 unique z values, but at least 1 hit
+        m = b = unc_m = unc_b = None
+        x_val = np.mean(front_xs)
+        x_min = x_max = x_val
+    else: # no hits
+        m = b = unc_m = unc_b = x_min = x_max = None
+    fit_results['x_z_fit'] = {
+        "m": m, "b": b, "unc_m": unc_m, "unc_b": unc_b,
+        "x_min": x_min, "x_max": x_max
+    }
 
     return fit_results
+

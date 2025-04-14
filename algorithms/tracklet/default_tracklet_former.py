@@ -1,27 +1,34 @@
 from typing import List, Any
+from collections import Counter
 from models.tracklet import Tracklet
 from models.hit import Hit
-from algorithms.tracklet.tracklet_former import TrackletFormer  # your abstract base
+from algorithms.tracklet.tracklet_former import TrackletFormer
 
 class DefaultTrackletFormer(TrackletFormer):
-    def form_tracklets(self, file: Any, entry_index: int) -> List[Tracklet]:
-        tree = file.Get("rec")
-        geoHelper = file.Get("PIMCGeoHelper")
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> List[Tracklet]:
         tree.GetEntry(entry_index)
 
         tracklets = []
         tracklet_counter = 0
+        n_patterns_truth = 0
+        particles_counter = Counter()
+        patterns_truth = {}
 
-        for pattern in tree.patternVec:
+        for pattern_idx, pattern in enumerate(tree.patternVec):
+            n_patterns_truth += 1
             indices = pattern.GetTrackletIndices()
+            pattern_tracklet_ids = []
+
             for index in indices:
                 tracklet = tree.trackletVec[index]
-                tracklet_id = tracklet_counter
-                tracklet_counter += 1
                 particle_id = tracklet.GetPID()
                 e_id = tracklet.GetEID()
                 hits = []
 
+                # Count the particle
+                particles_counter[particle_id] += 1
+
+                # Collect hits
                 for hit in tracklet.GetAllHits():
                     vid = hit.GetVID()
                     vname = geoHelper.GetVolumeName(vid).Data()
@@ -47,6 +54,11 @@ class DefaultTrackletFormer(TrackletFormer):
                     )
                     hits.append(hit_obj)
 
+                # Assign tracklet_id and append to pattern map
+                tracklet_id = tracklet_counter
+                tracklet_counter += 1
+                pattern_tracklet_ids.append(tracklet_id)
+
                 tracklets.append(Tracklet(
                     tracklet_id=tracklet_id,
                     particle_id=particle_id,
@@ -54,6 +66,12 @@ class DefaultTrackletFormer(TrackletFormer):
                     hits=hits
                 ))
 
-        result_info = {}
+            patterns_truth[pattern_idx] = pattern_tracklet_ids
+
+        result_info = {
+            "n_patterns_truth": n_patterns_truth,
+            "particles_in_event_truth": particles_counter,
+            "patterns_truth": patterns_truth
+        }
 
         return tracklets, result_info

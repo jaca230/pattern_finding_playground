@@ -1,7 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 import matplotlib.colors as mcolors
+from collections import Counter, defaultdict
 from models.event_patterns import EventPatterns
+from utils.particle_mapping import particle_name_map
+
+from typing import List
+
 
 
 def darken_color(color: str, factor: float = 0.6) -> str:
@@ -216,3 +222,194 @@ def plot_event(event_patterns: EventPatterns):
     plt.show()
 
     return fig, ax
+
+
+def generate_particle_label(counter: Counter) -> str:
+    """Generate a readable label from a Counter of particle names."""
+    return ' + '.join(f'{v}{k}' if v > 1 else k for k, v in sorted(counter.items()))
+
+def plot_event_classification_from_patterns(event_patterns_list, use_truth_particles=False, title=None):
+    bins = defaultdict(list)
+
+    for ep in event_patterns_list:
+        # Truth number of patterns for reference
+        n_truth = ep.extra_info.get("tracklet_algorithm_info", {}).get("n_patterns_truth", 0)
+
+        if use_truth_particles:
+            pid_counter = ep.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_truth", Counter())
+            particle_counts = Counter({
+                particle_name_map.get(pid, particle_name_map['default'])["name"]: count
+                for pid, count in pid_counter.items()
+            })
+        else:
+            tracklets = {t for pattern in ep.get_patterns() for v in pattern.get_vertices() for t in v.get_tracklets()}
+            particle_counts = Counter(t.particle_name for t in tracklets)
+
+        # Use frozenset of particle counts as the key
+        bins[frozenset(particle_counts.items())].append(ep)
+
+    # Prepare bins
+    bin_labels = []
+    all_counts = []
+    correct_counts = []
+    failed_counts = []
+    correctness_percentages = []
+
+    for particle_counter, eps in bins.items():
+        label = generate_particle_label(Counter(dict(particle_counter)))
+        total = len(eps)
+        correct = sum(1 for ep in eps if ep.validate())
+        failed = total - correct
+        percentage = (correct / total) * 100 if total > 0 else 0
+
+        bin_labels.append(label)
+        all_counts.append(total)
+        correct_counts.append(correct)
+        failed_counts.append(failed)
+        correctness_percentages.append(percentage)
+
+    # Sort by total events per bin
+    sorted_indices = np.argsort(all_counts)[::-1]
+    bin_labels = [bin_labels[i] for i in sorted_indices]
+    all_counts = np.array(all_counts)[sorted_indices]
+    correct_counts = np.array(correct_counts)[sorted_indices]
+    failed_counts = np.array(failed_counts)[sorted_indices]
+    correctness_percentages = np.array(correctness_percentages)[sorted_indices]
+
+    # Plotting
+    fig, ax1 = plt.subplots(figsize=(10, 8))
+    x = np.arange(len(bin_labels))
+    width = 0.25
+
+    ax1.bar(x - width, all_counts, color='lightgray', label="Total", width=width)
+    ax1.bar(x, correct_counts, color='lightblue', label="Correct", width=width)
+    ax1.bar(x + width, failed_counts, color='lightcoral', label="Failed", width=width)
+
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([r"$" + label + r"$" if label else r"$\emptyset$" for label in bin_labels],
+                        rotation=45, ha="right", fontsize=10)
+    ax1.set_ylabel("Event Count")
+    if title is None:
+        title = f"Pattern Reconstruction by Particle Composition ($N_{{\\text{{events}}}} = {len(event_patterns_list)}$)"
+    ax1.set_title(title)
+    ax1.legend()
+    ax1.set_yscale('log')
+
+    # Add percentage and fraction above bars
+    cmap = plt.get_cmap("coolwarm_r")
+    norm = plt.Normalize(vmin=0, vmax=100)
+    max_height = max(all_counts)
+    ax1.set_ylim(0.9, max_height * 2)
+
+    for i, pct in enumerate(correctness_percentages):
+        color = cmap(norm(pct))
+        text = f"{pct:.1f}%\n{correct_counts[i]} / {all_counts[i]}"
+        ax1.text(x[i], all_counts[i] + 0.05 * all_counts[i], text,
+                 ha='center', va='bottom', fontsize=9, color=color)
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_event_patterns_summary(events: List[EventPatterns], title: str):
+    # Extract data
+    n_truth_patterns = []
+    n_reco_patterns = []
+    passed_validation = []
+    pattern_count_correct = []
+
+    for event in events:
+        truth_count = event.extra_info.get("tracklet_algorithm_info", {}).get("n_patterns_truth", 0)
+        reco_count = len(event.get_patterns())
+        valid = event.validate()
+        count_match = reco_count == truth_count
+
+        n_truth_patterns.append(truth_count)
+        n_reco_patterns.append(reco_count)
+        passed_validation.append(valid)
+        pattern_count_correct.append(count_match)
+
+    # Bin setup
+    max_val = max(max(n_truth_patterns, default=0), max(n_reco_patterns, default=0))
+    bins = np.arange(0, max_val + 2)
+
+    # Create 2x2 subplot layout
+    fig, ax = plt.subplots(2, 2, figsize=(16, 12))
+
+    # Histogram of truth vs reco
+    ax[0, 0].hist(n_truth_patterns, bins=bins, color='tab:blue', alpha=0.7, label='Truth Patterns')
+    ax[0, 0].hist(n_reco_patterns, bins=bins, color='tab:red', alpha=0.7, label='Reco Patterns')
+    ax[0, 0].set_xlabel('Number of Patterns', fontsize=18)
+    ax[0, 0].set_ylabel('Events', fontsize=18)
+    ax[0, 0].legend(fontsize=16)
+    ax[0, 0].grid(True)
+    ax[0, 0].set_xticks(bins[:-1] + 0.5)
+    ax[0, 0].set_xticklabels(bins[:-1], fontsize=16)
+    ax[0, 0].tick_params(axis='y', labelsize=16)
+
+    # 2D histogram: truth vs reco count
+    counts, xedges, yedges, im = ax[0, 1].hist2d(n_truth_patterns, n_reco_patterns,
+                                                 bins=[bins, bins], cmap='viridis', norm=LogNorm())
+    fig.colorbar(im, ax=ax[0, 1], label='Number of Events')
+    ax[0, 1].set_xlabel('Truth Patterns', fontsize=18)
+    ax[0, 1].set_ylabel('Reco Patterns', fontsize=18)
+    ax[0, 1].set_xticks(bins[:-1] + 0.5)
+    ax[0, 1].set_yticks(bins[:-1] + 0.5)
+    ax[0, 1].set_xticklabels(bins[:-1], fontsize=16)
+    ax[0, 1].set_yticklabels(bins[:-1], fontsize=16)
+
+    for i in range(len(xedges) - 1):
+        for j in range(len(yedges) - 1):
+            count = counts[i, j]
+            if count > 0:
+                x_pos = (xedges[i] + xedges[i + 1]) / 2
+                y_pos = (yedges[j] + yedges[j + 1]) / 2
+                ax[0, 1].text(x_pos, y_pos, f'{int(count)}', ha='center', va='center', color='black', fontweight='bold', fontsize=14)
+
+    # Confusion matrix: pattern count correct vs full validation
+    # Matrix layout:
+    # Rows (y-axis): Validation status → Failed (0), Passed (1)
+    # Cols (x-axis): Pattern count → Incorrect (0), Correct (1)
+    conf_matrix = np.zeros((2, 2), dtype=int)
+
+    for v, p in zip(passed_validation, pattern_count_correct):
+        row = 0 if v else 1
+        col = 1 if p else 0
+        conf_matrix[row, col] += 1
+
+    im = ax[1, 0].imshow(conf_matrix, cmap='Blues', interpolation='nearest', aspect='auto')
+    ax[1, 0].set_xticks([0, 1])
+    ax[1, 0].set_yticks([0, 1])
+    ax[1, 0].set_xticklabels(['False', 'True'], fontsize=16)
+    ax[1, 0].set_yticklabels(['True', 'False'], fontsize=16)
+    ax[1, 0].set_xlabel('Number of Patterns Correct', fontsize=18)
+    ax[1, 0].set_ylabel('Passed Validation', fontsize=18)
+    fig.colorbar(im, ax=ax[1, 0], label='Event Count')
+
+    total = len(events)
+    for i in range(2):
+        for j in range(2):
+            count = conf_matrix[i, j]
+            ax[1, 0].text(j, i, f'{count} ({count/total:.2%})', ha='center', va='center', color='orange', fontweight='bold', fontsize=14)
+
+    # Info box
+    n_failed = int(conf_matrix[1, 0] + conf_matrix[1, 1])
+    n_passed = int(conf_matrix[0, 0] + conf_matrix[0, 1])
+    total_events = n_passed + n_failed
+
+    performance = (
+        (conf_matrix[0, 1] - abs(conf_matrix[0, 0] - conf_matrix[1, 1])) / total_events
+        if total_events > 0 else 0
+    )
+
+    ax[1, 1].axis('off')
+    ax[1, 1].text(0.1, 0.8, f'Total Events: {total_events}', fontsize=16)
+    ax[1, 1].text(0.1, 0.7, f'Passed Validation: {n_passed}', fontsize=16)
+    ax[1, 1].text(0.1, 0.6, f'Failed Validation: {n_failed}', fontsize=16)
+    ax[1, 1].text(0.1, 0.5, f'Performance: {performance:.2%}', fontsize=16)
+
+
+    # Title and layout
+    fig.suptitle(title, fontsize=20)
+    plt.tight_layout()
+    plt.show()
+

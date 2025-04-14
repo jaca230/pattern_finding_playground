@@ -4,13 +4,14 @@ from models.tracklet import Tracklet
 
 class TrackletFormer(ABC):
     @abstractmethod
-    def form_tracklets(self, file: Any, entry_index: int) -> List[Tracklet]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> List[Tracklet]:
         """
-        Forms a list of Tracklet objects from the given file and entry index.
+        Forms a list of Tracklet objects from the given tree and geoHelper at a specified entry.
 
         Args:
-            file: A ROOT file or similar object that provides access to event data.
-            entry_index: The index of the event within the file.
+            tree: The ROOT TTree containing the event data.
+            geoHelper: A ROOT helper object (e.g., PIMCGeoHelper) for geometry lookups.
+            entry_index: The index of the event within the tree.
 
         Returns:
             A list of Tracklet objects for the given event.
