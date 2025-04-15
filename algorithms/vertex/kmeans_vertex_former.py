@@ -9,10 +9,11 @@ from utils.utils import fit_tracklet_hits
 from collections import defaultdict
 
 class KMeansVertexFormer(VertexFormer):
-    def __init__(self, n_iters=5, sigma=0.5):
+    def __init__(self, n_iters=5, sigma=0.5, use_front=True):
         """KMeans-based vertex formation."""
         self.n_iters = n_iters
         self.sigma = sigma
+        self.use_front = use_front
 
     def BIC(self, sigma, k, cluster_centers, end_points):
         """Compute the Bayesian Information Criterion for a clustering solution."""
@@ -246,8 +247,8 @@ class KMeansVertexFormer(VertexFormer):
         # Vertex set comparison logic
         result_info = {}
         result_info["vertex_comparison"] = {
-            "only_in_front": vertices_f - vertices_b,
-            "only_in_back": vertices_b - vertices_f,
+            "front_vertices": vertices_f,
+            "back_vertices": vertices_b,
             "match": vertices_f == vertices_b,
         }
 
@@ -265,7 +266,9 @@ class KMeansVertexFormer(VertexFormer):
             }
         }
 
-        return vertices_f, result_info
+        vertices = vertices_f if self.use_front else vertices_b
+
+        return vertices, result_info
 
 
 

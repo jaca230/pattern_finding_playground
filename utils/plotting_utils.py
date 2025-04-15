@@ -310,12 +310,80 @@ def plot_event_classification_from_patterns(event_patterns_list, use_truth_parti
     plt.tight_layout()
     plt.show()
 
+def plot_truth_vs_reco_hist(ax, n_truth, n_reco, bins):
+    ax.hist(n_truth, bins=bins, color='tab:blue', alpha=0.7, label='Truth Patterns')
+    ax.hist(n_reco, bins=bins, color='tab:red', alpha=0.7, label='Reco Patterns')
+    ax.set_xlabel('Number of Patterns', fontsize=18)
+    ax.set_ylabel('Events', fontsize=18)
+    ax.legend(fontsize=16)
+    ax.grid(True)
+    ax.set_xticks(bins[:-1] + 0.5)
+    ax.set_xticklabels(bins[:-1], fontsize=16)
+    ax.tick_params(axis='y', labelsize=16)
+
+def plot_2d_truth_vs_reco(ax, n_truth, n_reco, bins):
+    counts, xedges, yedges, im = ax.hist2d(n_truth, n_reco, bins=[bins, bins], cmap='viridis', norm=LogNorm())
+    for i in range(len(xedges) - 1):
+        for j in range(len(yedges) - 1):
+            count = counts[i, j]
+            if count > 0:
+                x_pos = (xedges[i] + xedges[i + 1]) / 2
+                y_pos = (yedges[j] + yedges[j + 1]) / 2
+                ax.text(x_pos, y_pos, f'{int(count)}', ha='center', va='center', color='black', fontweight='bold', fontsize=14)
+
+    ax.set_xlabel('Truth Patterns', fontsize=18)
+    ax.set_ylabel('Reco Patterns', fontsize=18)
+    ax.set_xticks(bins[:-1] + 0.5)
+    ax.set_yticks(bins[:-1] + 0.5)
+    ax.set_xticklabels(bins[:-1], fontsize=16)
+    ax.set_yticklabels(bins[:-1], fontsize=16)
+    return im
+
+def plot_confusion_matrix(ax, metric1, metric2, total, 
+                          x_axis_label="Metric 2 (X)", 
+                          y_axis_label="Metric 1 (Y)", 
+                          x_tick_labels=('False', 'True'), 
+                          y_tick_labels=('True', 'False')):
+    conf_matrix = np.zeros((2, 2), dtype=int)
+    for m1, m2 in zip(metric1, metric2):
+        row = 0 if m1 else 1
+        col = 1 if m2 else 0
+        conf_matrix[row, col] += 1
+
+    im = ax.imshow(conf_matrix, cmap='Blues', interpolation='nearest', aspect='auto')
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(x_tick_labels, fontsize=16)
+    ax.set_yticklabels(y_tick_labels, fontsize=16)
+    ax.set_xlabel(x_axis_label, fontsize=18)
+    ax.set_ylabel(y_axis_label, fontsize=18)
+
+    for i in range(2):
+        for j in range(2):
+            count = conf_matrix[i, j]
+            ax.text(j, i, f'{count} ({count/total:.2%})', 
+                    ha='center', va='center', color='orange', fontweight='bold', fontsize=14)
+
+    return conf_matrix, im
+
+
+def plot_info_box(ax, conf_matrix, total):
+    n_failed = int(conf_matrix[1, 0] + conf_matrix[1, 1])
+    n_passed = int(conf_matrix[0, 0] + conf_matrix[0, 1])
+    performance = (conf_matrix[0, 1]) / total if total > 0 else 0
+
+    ax.axis('off')
+    ax.text(0.1, 0.8, f'Total Events: {total}', fontsize=16)
+    ax.text(0.1, 0.7, f'Passed Validation: {n_passed}', fontsize=16)
+    ax.text(0.1, 0.6, f'Failed Validation: {n_failed}', fontsize=16)
+    ax.text(0.1, 0.5, f'Performance: {performance:.2%}', fontsize=16)
+
+
 def plot_event_patterns_summary(events: List[EventPatterns], title: str):
-    # Extract data
-    n_truth_patterns = []
-    n_reco_patterns = []
-    passed_validation = []
-    pattern_count_correct = []
+    n_truth = []
+    n_reco = []
+    passed = []
+    correct_count = []
 
     for event in events:
         truth_count = event.extra_info.get("tracklet_algorithm_info", {}).get("n_patterns_truth", 0)
@@ -323,93 +391,34 @@ def plot_event_patterns_summary(events: List[EventPatterns], title: str):
         valid = event.validate()
         count_match = reco_count == truth_count
 
-        n_truth_patterns.append(truth_count)
-        n_reco_patterns.append(reco_count)
-        passed_validation.append(valid)
-        pattern_count_correct.append(count_match)
+        n_truth.append(truth_count)
+        n_reco.append(reco_count)
+        passed.append(valid)
+        correct_count.append(count_match)
 
-    # Bin setup
-    max_val = max(max(n_truth_patterns, default=0), max(n_reco_patterns, default=0))
+    max_val = max(max(n_truth, default=0), max(n_reco, default=0))
     bins = np.arange(0, max_val + 2)
 
-    # Create 2x2 subplot layout
     fig, ax = plt.subplots(2, 2, figsize=(16, 12))
 
-    # Histogram of truth vs reco
-    ax[0, 0].hist(n_truth_patterns, bins=bins, color='tab:blue', alpha=0.7, label='Truth Patterns')
-    ax[0, 0].hist(n_reco_patterns, bins=bins, color='tab:red', alpha=0.7, label='Reco Patterns')
-    ax[0, 0].set_xlabel('Number of Patterns', fontsize=18)
-    ax[0, 0].set_ylabel('Events', fontsize=18)
-    ax[0, 0].legend(fontsize=16)
-    ax[0, 0].grid(True)
-    ax[0, 0].set_xticks(bins[:-1] + 0.5)
-    ax[0, 0].set_xticklabels(bins[:-1], fontsize=16)
-    ax[0, 0].tick_params(axis='y', labelsize=16)
+    plot_truth_vs_reco_hist(ax[0, 0], n_truth, n_reco, bins)
+    im2d = plot_2d_truth_vs_reco(ax[0, 1], n_truth, n_reco, bins)
+    fig.colorbar(im2d, ax=ax[0, 1], label='Number of Events')
 
-    # 2D histogram: truth vs reco count
-    counts, xedges, yedges, im = ax[0, 1].hist2d(n_truth_patterns, n_reco_patterns,
-                                                 bins=[bins, bins], cmap='viridis', norm=LogNorm())
-    fig.colorbar(im, ax=ax[0, 1], label='Number of Events')
-    ax[0, 1].set_xlabel('Truth Patterns', fontsize=18)
-    ax[0, 1].set_ylabel('Reco Patterns', fontsize=18)
-    ax[0, 1].set_xticks(bins[:-1] + 0.5)
-    ax[0, 1].set_yticks(bins[:-1] + 0.5)
-    ax[0, 1].set_xticklabels(bins[:-1], fontsize=16)
-    ax[0, 1].set_yticklabels(bins[:-1], fontsize=16)
-
-    for i in range(len(xedges) - 1):
-        for j in range(len(yedges) - 1):
-            count = counts[i, j]
-            if count > 0:
-                x_pos = (xedges[i] + xedges[i + 1]) / 2
-                y_pos = (yedges[j] + yedges[j + 1]) / 2
-                ax[0, 1].text(x_pos, y_pos, f'{int(count)}', ha='center', va='center', color='black', fontweight='bold', fontsize=14)
-
-    # Confusion matrix: pattern count correct vs full validation
-    # Matrix layout:
-    # Rows (y-axis): Validation status → Failed (0), Passed (1)
-    # Cols (x-axis): Pattern count → Incorrect (0), Correct (1)
-    conf_matrix = np.zeros((2, 2), dtype=int)
-
-    for v, p in zip(passed_validation, pattern_count_correct):
-        row = 0 if v else 1
-        col = 1 if p else 0
-        conf_matrix[row, col] += 1
-
-    im = ax[1, 0].imshow(conf_matrix, cmap='Blues', interpolation='nearest', aspect='auto')
-    ax[1, 0].set_xticks([0, 1])
-    ax[1, 0].set_yticks([0, 1])
-    ax[1, 0].set_xticklabels(['False', 'True'], fontsize=16)
-    ax[1, 0].set_yticklabels(['True', 'False'], fontsize=16)
-    ax[1, 0].set_xlabel('Number of Patterns Correct', fontsize=18)
-    ax[1, 0].set_ylabel('Passed Validation', fontsize=18)
-    fig.colorbar(im, ax=ax[1, 0], label='Event Count')
-
-    total = len(events)
-    for i in range(2):
-        for j in range(2):
-            count = conf_matrix[i, j]
-            ax[1, 0].text(j, i, f'{count} ({count/total:.2%})', ha='center', va='center', color='orange', fontweight='bold', fontsize=14)
-
-    # Info box
-    n_failed = int(conf_matrix[1, 0] + conf_matrix[1, 1])
-    n_passed = int(conf_matrix[0, 0] + conf_matrix[0, 1])
-    total_events = n_passed + n_failed
-
-    performance = (
-        (conf_matrix[0, 1] - abs(conf_matrix[0, 0] - conf_matrix[1, 1])) / total_events
-        if total_events > 0 else 0
+    conf_matrix, im_conf = plot_confusion_matrix(
+        ax[1, 0],
+        passed,                   # Metric 1 (Y-axis)
+        correct_count,            # Metric 2 (X-axis)
+        len(events),
+        x_axis_label="Pattern Count Correct",
+        y_axis_label="Passed Validation"
     )
+    fig.colorbar(im_conf, ax=ax[1, 0], label='Event Count')
 
-    ax[1, 1].axis('off')
-    ax[1, 1].text(0.1, 0.8, f'Total Events: {total_events}', fontsize=16)
-    ax[1, 1].text(0.1, 0.7, f'Passed Validation: {n_passed}', fontsize=16)
-    ax[1, 1].text(0.1, 0.6, f'Failed Validation: {n_failed}', fontsize=16)
-    ax[1, 1].text(0.1, 0.5, f'Performance: {performance:.2%}', fontsize=16)
+    plot_info_box(ax[1, 1], conf_matrix, len(events))
 
-
-    # Title and layout
     fig.suptitle(title, fontsize=20)
     plt.tight_layout()
     plt.show()
+
 
