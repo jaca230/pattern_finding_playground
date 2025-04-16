@@ -82,7 +82,7 @@ def plot_y_view(ax, tracklets):
             ax.plot([ep0.z, ep1.z], [ep0.y, ep1.y], color=darken_color(color, 0.3), linestyle='-', linewidth=3, alpha=0.7)
 
 
-def plot_time_view(ax, tracklets, time_gap_threshold=20, gap_percentage=0.1):
+def plot_time_view(ax, tracklets, time_gap_threshold=0.2, gap_percentage=0.1):
     ax.set_ylabel("Time [ns]")
 
     all_hits = sorted([hit for t in tracklets for hit in t.hits], key=lambda h: h.time)
@@ -161,7 +161,8 @@ def plot_energy_view(ax, tracklets):
                    color=color,
                    alpha=0.7,
                    label=f"${tracklet.particle_name}$")
-
+    
+    ax.set_yscale('log')
     ax.set_xlabel("z [mm]")
 
 
