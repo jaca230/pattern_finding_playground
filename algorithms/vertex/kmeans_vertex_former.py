@@ -9,11 +9,20 @@ from utils.utils import fit_tracklet_hits
 from collections import defaultdict
 
 class KMeansVertexFormer(VertexFormer):
-    def __init__(self, n_iters=5, sigma=0.5, plane="front"):
+    def __init__(self, n_iters=5, sigma=0.5, plane="front", planes_to_run={"front", "back", "both"}):
         """KMeans-based vertex formation for specified plane: 'front', 'back', or 'both'."""
         self.n_iters = n_iters
         self.sigma = sigma
         self.plane = plane  # 'front', 'back', or 'both'
+        
+        # Ensure the requested output plane is actually run
+        if plane not in planes_to_run:
+            planes_to_run = set(planes_to_run)  # Convert to set if not already
+            planes_to_run.add(plane)
+
+        self.planes_to_run = planes_to_run  # Subset of planes to actually run k-means on
+
+
 
     def BIC(self, sigma, k, cluster_centers, end_points):
         """Compute the Bayesian Information Criterion for a clustering solution."""
@@ -119,7 +128,7 @@ class KMeansVertexFormer(VertexFormer):
         return False
 
     def constrained_k_means(self, tracklet_end_points_vec, n_iters=5, sigma=0.3):
-        """Run constrained k-means on the tracklet endpoints."""
+        """Run the constrained k-means algorithm over the end points."""
         n_end_points = 0
         end_points = []
         for i, tracklet_end_points in enumerate(tracklet_end_points_vec):
@@ -130,7 +139,6 @@ class KMeansVertexFormer(VertexFormer):
         min_bic = 1e9
         min_k = 1e9
         min_vertices_vec = []
-        min_vertices_endpoints_map = []
 
         for k in range(1, n_end_points + 1):
             vertices_vec = self.create_vertex_guess(k, tracklet_end_points_vec)
@@ -139,34 +147,32 @@ class KMeansVertexFormer(VertexFormer):
             for iter in range(n_iters):
                 vertices_vec = self.compute_new_vertices(vertices_vec, tracklet_end_points_vec, vertices_end_points_map)
                 vertices_end_points_map = self.assign_vertices(vertices_vec, tracklet_end_points_vec)
-            
-            vertices_indices = []
-            for i, vertices_end_points in enumerate(vertices_end_points_map):
-                for j, index in enumerate(vertices_end_points):
-                    vertices_indices.append(vertices_end_points_map[i][j])
 
-            #Check if there are any empty vertices. If so, point is not good. Try again!
-            unique_vertex_indices=np.unique(vertices_indices)
-            is_empty_vertex=self.check_if_empty_vertex(k,unique_vertex_indices)
-            if is_empty_vertex :
-                continue
+                vertices_indices = []
+                for i, vertices_end_points in enumerate(vertices_end_points_map):
+                    for j, index in enumerate(vertices_end_points):
+                        vertices_indices.append(vertices_end_points_map[i][j])
 
-            #Check if this is the best we've done
-            vertices_map = []
-            for index in vertices_indices:
-                vertices_map.append(vertices_vec[index])
+                unique_vertex_indices = np.unique(vertices_indices)
+                is_empty_vertex = self.check_if_empty_vertex(k, unique_vertex_indices)
+                if is_empty_vertex:
+                    continue
 
-            vertices_map = np.array(vertices_map)
-            end_points = np.array(end_points)
+                vertices_map = []
+                for index in vertices_indices:
+                    vertices_map.append(vertices_vec[index])
+                vertices_map = np.array(vertices_map)
+                end_points_arr = np.array(end_points)
 
-            bic = self.BIC(sigma, k, vertices_map, end_points)
-            if bic < min_bic:
-                min_bic = bic
-                min_k = k
-                min_vertices_vec = vertices_vec
-                min_vertices_endpoints_map=vertices_end_points_map
+                bic = self.BIC(sigma, k, vertices_map, end_points_arr)
+                if bic < min_bic:
+                    min_bic = bic
+                    min_k = k
+                    min_vertices_vec = vertices_vec
 
-        return min_bic, min_k, min_vertices_vec, min_vertices_endpoints_map
+        vertices_end_points_map = self.assign_vertices(min_vertices_vec, tracklet_end_points_vec)
+        return min_bic, min_k, min_vertices_vec, vertices_end_points_map
+
     
     def determine_endpoints(self, tracklet: Tracklet) -> tuple[Optional[Point3D], Optional[Point3D]]:
         """Determines the endpoints of a tracklet based on the fit results and stores the endpoints."""
@@ -195,6 +201,22 @@ class KMeansVertexFormer(VertexFormer):
 
         return endpoint_0, endpoint_1
 
+    def create_vertices_from_map(self, vertex_endpoint_map, tracklets):
+        """Helper function to create Vertex objects from the vertex-endpoint map."""
+        vertex_to_tracklets = defaultdict(set)
+        for i, vertex_indices in enumerate(vertex_endpoint_map):
+            for v_idx in vertex_indices:
+                vertex_to_tracklets[v_idx].add(tracklets[i])
+
+        vertices = set()
+        for v_idx, tracklets_set in vertex_to_tracklets.items():
+            vertex = Vertex(vertex_id=v_idx)
+            for tracklet in tracklets_set:
+                vertex.add_tracklet(tracklet)
+            vertices.add(vertex)
+
+        return vertices
+    
     def form_vertices(self, tracklets: Set[Tracklet]) -> tuple[Set[Vertex], dict]:
         """Find vertices for the given set of tracklets using the constrained k-means algorithm."""
 
@@ -235,44 +257,38 @@ class KMeansVertexFormer(VertexFormer):
             if tracklet_both_endpoints:
                 both_endpoints.append(tracklet_both_endpoints)
 
-        # Run constrained k-means clustering for all planes
-        min_BIC_f, min_k_f, centroids_f, vertex_endpoint_map_f = self.constrained_k_means(front_endpoints, n_iters=self.n_iters, sigma=self.sigma)
-        min_BIC_b, min_k_b, centroids_b, vertex_endpoint_map_b = self.constrained_k_means(back_endpoints, n_iters=self.n_iters, sigma=self.sigma)
-        min_BIC_both, min_k_both, centroids_both, vertex_endpoint_map_both = self.constrained_k_means(both_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+        result_info = {"vertex_comparison": {}, "stats": {}}
+        vertices_front = vertices_back = vertices_both = set()
 
-        # Create vertices for each plane
-        vertices_front = self.create_vertices_from_map(vertex_endpoint_map_f, tracklets)
-        vertices_back = self.create_vertices_from_map(vertex_endpoint_map_b, tracklets)
-        vertices_both = self.create_vertices_from_map(vertex_endpoint_map_both, tracklets)
-
-        # Vertex set comparison logic
-        result_info = {}
-
-        # Vertex comparison results: check if front, back, and both vertices match
-        result_info["vertex_comparison"] = {
-            "front_vertices": vertices_front,
-            "back_vertices": vertices_back,
-            "both_vertices": vertices_both
-        }
-
-        # Stats: BIC and k values for front, back, and both planes
-        result_info["stats"] = {
-            "front": {
+        if "front" in self.planes_to_run:
+            min_BIC_f, min_k_f, centroids_f, vertex_endpoint_map_f = self.constrained_k_means(front_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            vertices_front = self.create_vertices_from_map(vertex_endpoint_map_f, tracklets)
+            result_info["vertex_comparison"]["front_vertices"] = vertices_front
+            result_info["stats"]["front"] = {
                 "BIC": min_BIC_f,
                 "k": min_k_f,
                 "centroids": centroids_f,
-            },
-            "back": {
+            }
+
+        if "back" in self.planes_to_run:
+            min_BIC_b, min_k_b, centroids_b, vertex_endpoint_map_b = self.constrained_k_means(back_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            vertices_back = self.create_vertices_from_map(vertex_endpoint_map_b, tracklets)
+            result_info["vertex_comparison"]["back_vertices"] = vertices_back
+            result_info["stats"]["back"] = {
                 "BIC": min_BIC_b,
                 "k": min_k_b,
                 "centroids": centroids_b,
-            },
-            "both": {
+            }
+
+        if "both" in self.planes_to_run:
+            min_BIC_both, min_k_both, centroids_both, vertex_endpoint_map_both = self.constrained_k_means(both_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            vertices_both = self.create_vertices_from_map(vertex_endpoint_map_both, tracklets)
+            result_info["vertex_comparison"]["both_vertices"] = vertices_both
+            result_info["stats"]["both"] = {
                 "BIC": min_BIC_both,
                 "k": min_k_both,
                 "centroids": centroids_both,
             }
-        }
 
         # Return results for the requested plane
         if self.plane == "front":
@@ -284,18 +300,3 @@ class KMeansVertexFormer(VertexFormer):
 
         return vertices, result_info
 
-    def create_vertices_from_map(self, vertex_endpoint_map, tracklets):
-        """Helper function to create Vertex objects from the vertex-endpoint map."""
-        vertex_to_tracklets = defaultdict(set)
-        for i, vertex_indices in enumerate(vertex_endpoint_map):
-            for v_idx in vertex_indices:
-                vertex_to_tracklets[v_idx].add(tracklets[i])
-
-        vertices = set()
-        for v_idx, tracklets_set in vertex_to_tracklets.items():
-            vertex = Vertex(vertex_id=v_idx)
-            for tracklet in tracklets_set:
-                vertex.add_tracklet(tracklet)
-            vertices.add(vertex)
-
-        return vertices
