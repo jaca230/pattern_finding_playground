@@ -7,13 +7,15 @@ from algorithms.vertex.vertex_former import VertexFormer
 from models.point_3d import Point3D
 from utils.utils import fit_tracklet_hits
 from collections import defaultdict
+from sklearn.cluster import DBSCAN
 
 class KMeansVertexFormer(VertexFormer):
-    def __init__(self, n_iters=5, sigma=0.5, plane="front", planes_to_run={"front", "back", "both"}):
+    def __init__(self, n_iters=5, sigma=0.5, plane="front", planes_to_run={"front", "back", "both"}, seed_method = "random"):
         """KMeans-based vertex formation for specified plane: 'front', 'back', or 'both'."""
         self.n_iters = n_iters
         self.sigma = sigma
         self.plane = plane  # 'front', 'back', or 'both'
+        self.seed_method = seed_method # 'random' or 'at_endpoints'
         
         # Ensure the requested output plane is actually run
         if plane not in planes_to_run:
@@ -74,33 +76,81 @@ class KMeansVertexFormer(VertexFormer):
         return vertices_end_points_map
 
     def create_vertex_guess(self, k, tracklet_end_points_vec):
-        """Generate random guesses for k vertices."""
+        """Wrapper that selects vertex guessing strategy."""
+        if self.seed_method == "distance":
+            return self.create_vertex_guess_by_distance(k, tracklet_end_points_vec)
+        else:
+            return self.create_vertex_guess_random(k, tracklet_end_points_vec)
+
+    def create_vertex_guess_random(self, k, tracklet_end_points_vec):
+        """Randomly generate k vertex guesses within the bounding box of all endpoints."""
         x_values = []
         y_values = []
         z_values = []
 
-        for i, tracklet_end_points in enumerate(tracklet_end_points_vec):
-            for j, end_point in enumerate(tracklet_end_points):
+        for endpoints in tracklet_end_points_vec:
+            for end_point in endpoints:
                 x_values.append(end_point[0])
                 y_values.append(end_point[1])
                 z_values.append(end_point[2])
 
-        min_x = min(x_values)
-        min_y = min(y_values)
-        min_z = min(z_values)
-
-        max_x = max(x_values)
-        max_y = max(y_values)
-        max_z = max(z_values)
+        min_x, max_x = min(x_values), max(x_values)
+        min_y, max_y = min(y_values), max(y_values)
+        min_z, max_z = min(z_values), max(z_values)
 
         vertices = []
-        for i in range(k):
+        for _ in range(k):
             rand_x = random.uniform(min_x, max_x)
             rand_y = random.uniform(min_y, max_y)
             rand_z = random.uniform(min_z, max_z)
             vertices.append(np.array([rand_x, rand_y, rand_z]))
 
         return vertices
+
+    def create_vertex_guess_by_distance(self, k, tracklet_end_points_vec):
+        """Cluster endpoints (excluding intra-tracklet groups), then fill with random guesses if needed."""
+        # Flatten all endpoints and keep track of their parent tracklet
+        all_endpoints = []
+        tracklet_ids = []
+        for tracklet_idx, endpoints in enumerate(tracklet_end_points_vec):
+            for endpoint in endpoints:
+                all_endpoints.append(np.array(endpoint))
+                tracklet_ids.append(tracklet_idx)
+
+        if not all_endpoints:
+            return self.create_vertex_guess_random(k, tracklet_end_points_vec)
+
+        all_endpoints = np.array(all_endpoints)
+        tracklet_ids = np.array(tracklet_ids)
+
+        # Perform DBSCAN clustering
+        db = DBSCAN(eps=0.5, min_samples=1).fit(all_endpoints)
+        labels = db.labels_
+        unique_labels = set(labels)
+
+        cluster_centroids = []
+        for label in unique_labels:
+            # Get indices of points in this cluster
+            indices = np.where(labels == label)[0]
+
+            # Extract the tracklet IDs in this cluster
+            cluster_tracklet_ids = tracklet_ids[indices]
+
+            # If no repeated tracklet IDs, accept the cluster
+            if len(set(cluster_tracklet_ids)) == len(cluster_tracklet_ids):
+                cluster_points = all_endpoints[indices]
+                centroid = np.mean(cluster_points, axis=0)
+                cluster_centroids.append(centroid)
+
+        # Return as many centroids as we can, fill the rest with random guesses
+        if len(cluster_centroids) >= k:
+            return cluster_centroids[:k]
+
+        remaining = k - len(cluster_centroids)
+        random_guesses = self.create_vertex_guess_random(remaining, tracklet_end_points_vec)
+        return cluster_centroids + random_guesses
+
+
 
     def compute_new_vertices(self, vertices_vec, tracklet_end_points_vec, vertices_end_points_map):
         """Compute new vertex positions as the mean of assigned tracklet endpoints."""
@@ -129,6 +179,7 @@ class KMeansVertexFormer(VertexFormer):
 
     def constrained_k_means(self, tracklet_end_points_vec, n_iters=5, sigma=0.3):
         """Run the constrained k-means algorithm over the end points."""
+
         n_end_points = 0
         end_points = []
         for i, tracklet_end_points in enumerate(tracklet_end_points_vec):
@@ -138,13 +189,16 @@ class KMeansVertexFormer(VertexFormer):
 
         min_bic = 1e9
         min_k = 1e9
+        min_iter = 0
         min_vertices_vec = []
+        all_results = []  # To store BIC, k, and vertices for each attempt
 
         for k in range(1, n_end_points + 1):
             vertices_vec = self.create_vertex_guess(k, tracklet_end_points_vec)
             vertices_end_points_map = self.assign_vertices(vertices_vec, tracklet_end_points_vec)
 
             for iter in range(n_iters):
+                iteration_index = iter + 1
                 vertices_vec = self.compute_new_vertices(vertices_vec, tracklet_end_points_vec, vertices_end_points_map)
                 vertices_end_points_map = self.assign_vertices(vertices_vec, tracklet_end_points_vec)
 
@@ -165,14 +219,22 @@ class KMeansVertexFormer(VertexFormer):
                 end_points_arr = np.array(end_points)
 
                 bic = self.BIC(sigma, k, vertices_map, end_points_arr)
+
+                all_results.append({
+                    "bic": bic,
+                    "k": k,
+                    "vertices": vertices_vec.copy(),  # or deepcopy if needed
+                    "iteration": iteration_index
+                })
+
                 if bic < min_bic:
                     min_bic = bic
                     min_k = k
                     min_vertices_vec = vertices_vec
+                    min_iter = iteration_index
 
         vertices_end_points_map = self.assign_vertices(min_vertices_vec, tracklet_end_points_vec)
-        return min_bic, min_k, min_vertices_vec, vertices_end_points_map
-
+        return min_bic, min_k, min_vertices_vec, min_iter, vertices_end_points_map, all_results
     
     def determine_endpoints(self, tracklet: Tracklet) -> tuple[Optional[Point3D], Optional[Point3D]]:
         """Determines the endpoints of a tracklet based on the fit results and stores the endpoints."""
@@ -261,34 +323,47 @@ class KMeansVertexFormer(VertexFormer):
         vertices_front = vertices_back = vertices_both = set()
 
         if "front" in self.planes_to_run:
-            min_BIC_f, min_k_f, centroids_f, vertex_endpoint_map_f = self.constrained_k_means(front_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            min_BIC_f, min_k_f, centroids_f, min_iter_f, vertex_endpoint_map_f, all_results_f = self.constrained_k_means(
+                front_endpoints, n_iters=self.n_iters, sigma=self.sigma
+            )
             vertices_front = self.create_vertices_from_map(vertex_endpoint_map_f, tracklets)
             result_info["vertex_comparison"]["front_vertices"] = vertices_front
             result_info["stats"]["front"] = {
                 "BIC": min_BIC_f,
                 "k": min_k_f,
                 "centroids": centroids_f,
+                "iteration": min_iter_f,
+                "all_iterations": all_results_f,
             }
 
         if "back" in self.planes_to_run:
-            min_BIC_b, min_k_b, centroids_b, vertex_endpoint_map_b = self.constrained_k_means(back_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            min_BIC_b, min_k_b, centroids_b, min_iter_b, vertex_endpoint_map_b, all_results_b = self.constrained_k_means(
+                back_endpoints, n_iters=self.n_iters, sigma=self.sigma
+            )
             vertices_back = self.create_vertices_from_map(vertex_endpoint_map_b, tracklets)
             result_info["vertex_comparison"]["back_vertices"] = vertices_back
             result_info["stats"]["back"] = {
                 "BIC": min_BIC_b,
                 "k": min_k_b,
                 "centroids": centroids_b,
+                "iteration": min_iter_b,
+                "all_iterations": all_results_b,
             }
 
         if "both" in self.planes_to_run:
-            min_BIC_both, min_k_both, centroids_both, vertex_endpoint_map_both = self.constrained_k_means(both_endpoints, n_iters=self.n_iters, sigma=self.sigma)
+            min_BIC_both, min_k_both, centroids_both, min_iter_both, vertex_endpoint_map_both, all_results_both = self.constrained_k_means(
+                both_endpoints, n_iters=self.n_iters, sigma=self.sigma
+            )
             vertices_both = self.create_vertices_from_map(vertex_endpoint_map_both, tracklets)
             result_info["vertex_comparison"]["both_vertices"] = vertices_both
             result_info["stats"]["both"] = {
                 "BIC": min_BIC_both,
                 "k": min_k_both,
                 "centroids": centroids_both,
+                "iteration": min_iter_both,
+                "all_iterations": all_results_both,
             }
+
 
         # Return results for the requested plane
         if self.plane == "front":
