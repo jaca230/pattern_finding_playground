@@ -213,7 +213,7 @@ def plot_event(event_patterns: EventPatterns):
     plot_centroids([ax[0], ax[1]], event_patterns)
 
     for a in ax:
-        a.set_xlim(0, 7)  # Set z-limits
+        a.set_xlim(-0.5, 7)  # Set z-limits
     for a in ax[:-1]:
         a.label_outer()
 
