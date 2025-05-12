@@ -1,4 +1,4 @@
-from typing import List, Any, Tuple, Optional
+from typing import List, Any, Optional
 from collections import Counter
 from models.tracklet import Tracklet
 from models.hit import Hit
@@ -9,16 +9,18 @@ class ReconstructedTrackletFormer(TrackletFormer):
     def __init__(self, truth_tree: Optional[Any] = None):
         self.truth_tree = truth_tree  # Can be None if truth info is unavailable
 
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> Tuple[List[Tracklet], dict]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
         tree.GetEntry(entry_index)
         if self.truth_tree:
             self.truth_tree.GetEntry(entry_index)
 
         tracklets = []
         tracklet_counter = 0
+        reco_particles_counter = Counter()
 
         for index, tracklet in enumerate(tree.trackletVec):
             particle_id = tracklet.GetPID()
+            reco_particles_counter[particle_id] += 1
             e_id = tracklet.GetEID()
             hits = []
 
@@ -47,7 +49,6 @@ class ReconstructedTrackletFormer(TrackletFormer):
                 )
                 hits.append(hit_obj)
 
-            # Convert ROOT::Math::XYZVector to Point3D
             start_point = tracklet.GetStartPoint()
             stop_point = tracklet.GetStopPoint()
             point_0 = Point3D(start_point.X(), start_point.Y(), start_point.Z())
@@ -66,7 +67,6 @@ class ReconstructedTrackletFormer(TrackletFormer):
         # Determine which tree to use for truth info
         truth_source = self.truth_tree if self.truth_tree is not None else tree
 
-        # Extract truth info
         n_patterns_truth = 0
         particles_counter = Counter()
         patterns_truth = {}
@@ -88,7 +88,8 @@ class ReconstructedTrackletFormer(TrackletFormer):
         result_info = {
             "n_patterns_truth": n_patterns_truth,
             "particles_in_event_truth": particles_counter,
-            "patterns_truth": patterns_truth
+            "patterns_truth": patterns_truth,
+            "particles_in_event_reco": reco_particles_counter
         }
 
         return tracklets, result_info

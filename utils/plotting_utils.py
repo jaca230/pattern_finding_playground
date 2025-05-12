@@ -5,7 +5,7 @@ import matplotlib.colors as mcolors
 from collections import Counter, defaultdict
 from models.event_patterns import EventPatterns
 from utils.particle_mapping import particle_name_map
-
+import warnings
 from typing import List
 
 
@@ -231,27 +231,53 @@ def generate_particle_label(counter: Counter) -> str:
     """Generate a readable label from a Counter of particle names."""
     return ' + '.join(f'{v}{k}' if v > 1 else k for k, v in sorted(counter.items()))
 
-def plot_event_classification_from_patterns(event_patterns_list, use_truth_particles=False, title=None):
+def plot_event_classification_from_patterns(event_patterns_list, particle_source="pattern_reco", title=None, use_truth_particles=None):
+    """
+    Classify events based on particle composition and plot validation success.
+
+    Parameters:
+    - event_patterns_list: list of EventPatterns
+    - particle_source: one of {"truth", "reco", "pattern_reco"}
+    - title: optional plot title
+    - use_truth_particles: deprecated, use `particle_source='truth'` instead
+    """
+    # Handle deprecated use_truth_particles keyword
+    if use_truth_particles is not None:
+        warnings.warn(
+            "`use_truth_particles` is deprecated. Use `particle_source='truth'` instead.",
+            DeprecationWarning
+        )
+        # If particle_source is not already set, use the deprecated value
+        if particle_source != "pattern_reco":
+            raise ValueError("Cannot use both `particle_source` and `use_truth_particles`. Use only one.")
+        particle_source = "truth" if use_truth_particles else "pattern_reco"
+
+    # Validate the particle_source
+    assert particle_source in {"truth", "reco", "pattern_reco"}, "Invalid particle_source"
+
     bins = defaultdict(list)
 
     for ep in event_patterns_list:
-        # Truth number of patterns for reference
-        n_truth = ep.extra_info.get("tracklet_algorithm_info", {}).get("n_patterns_truth", 0)
-
-        if use_truth_particles:
+        if particle_source == "truth":
             pid_counter = ep.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_truth", Counter())
-            particle_counts = Counter({
-                particle_name_map.get(pid, particle_name_map['default'])["name"]: count
-                for pid, count in pid_counter.items()
-            })
-        else:
-            tracklets = {t for pattern in ep.get_patterns() for v in pattern.get_vertices() for t in v.get_tracklets()}
-            particle_counts = Counter(t.particle_name for t in tracklets)
+        elif particle_source == "reco":
+            pid_counter = ep.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_reco", Counter())
+        else:  # "pattern_reco"
+            tracklets = {
+                t for pattern in ep.get_patterns()
+                for vertex in pattern.get_vertices()
+                for t in vertex.get_tracklets()
+            }
+            pid_counter = Counter(t.particle_id for t in tracklets)
 
-        # Use frozenset of particle counts as the key
+        particle_counts = Counter({
+            particle_name_map.get(pid, particle_name_map["default"])["name"]: count
+            for pid, count in pid_counter.items()
+        })
+
         bins[frozenset(particle_counts.items())].append(ep)
 
-    # Prepare bins
+    # Prepare plotting bins
     bin_labels = []
     all_counts = []
     correct_counts = []
@@ -271,7 +297,7 @@ def plot_event_classification_from_patterns(event_patterns_list, use_truth_parti
         failed_counts.append(failed)
         correctness_percentages.append(percentage)
 
-    # Sort by total events per bin
+    # Sort bins by total
     sorted_indices = np.argsort(all_counts)[::-1]
     bin_labels = [bin_labels[i] for i in sorted_indices]
     all_counts = np.array(all_counts)[sorted_indices]
@@ -289,16 +315,18 @@ def plot_event_classification_from_patterns(event_patterns_list, use_truth_parti
     ax1.bar(x + width, failed_counts, color='lightcoral', label="Failed", width=width)
 
     ax1.set_xticks(x)
-    ax1.set_xticklabels([r"$" + label + r"$" if label else r"$\emptyset$" for label in bin_labels],
-                        rotation=45, ha="right", fontsize=10)
+    ax1.set_xticklabels(
+        [r"$" + label + r"$" if label else r"$\emptyset$" for label in bin_labels],
+        rotation=45, ha="right", fontsize=10
+    )
     ax1.set_ylabel("Event Count")
     if title is None:
-        title = f"Pattern Reconstruction by Particle Composition ($N_{{\\text{{events}}}} = {len(event_patterns_list)}$)"
+        title = f"Pattern Reconstruction by Particle Composition ({particle_source})\n" \
+                f"$N_{{\\text{{events}}}} = {len(event_patterns_list)}$"
     ax1.set_title(title)
     ax1.legend()
     ax1.set_yscale('log')
 
-    # Add percentage and fraction above bars
     cmap = plt.get_cmap("coolwarm_r")
     norm = plt.Normalize(vmin=0, vmax=100)
     max_height = max(all_counts)
@@ -421,6 +449,93 @@ def plot_event_patterns_summary(events: List[EventPatterns], title: str):
     plot_info_box(ax[1, 1], conf_matrix, len(events))
 
     fig.suptitle(title, fontsize=20)
+    plt.tight_layout()
+    plt.show()
+
+def plot_incorrect_event_misclassification_pie(event_patterns_list, max_labels=10, title=None):
+    """
+    Plots a pie chart of incorrect event classifications.
+    Each slice corresponds to a unique (pattern_reco, reco, truth) particle composition triplet.
+
+    Parameters:
+    - event_patterns_list: list of EventPatterns
+    - max_labels: maximum number of pie slices to label explicitly
+    - title: optional title for the plot
+    """
+    import matplotlib.pyplot as plt
+    from collections import Counter
+
+    error_groups = Counter()
+
+    for ep in event_patterns_list:
+        if ep.validate():
+            continue
+
+        info = ep.extra_info.get("tracklet_algorithm_info", {})
+        truth_counter = info.get("particles_in_event_truth", Counter())
+        reco_counter = info.get("particles_in_event_reco", Counter())
+
+        tracklets = {
+            t for pattern in ep.get_patterns()
+            for vertex in pattern.get_vertices()
+            for t in vertex.get_tracklets()
+        }
+        pattern_reco_counter = Counter(t.particle_id for t in tracklets)
+
+        def to_named(counter):
+            return Counter({
+                particle_name_map.get(pid, particle_name_map["default"])["name"]: count
+                for pid, count in counter.items()
+            })
+
+        pattern_named = frozenset(to_named(pattern_reco_counter).items())
+        reco_named = frozenset(to_named(reco_counter).items())
+        truth_named = frozenset(to_named(truth_counter).items())
+
+        key = (pattern_named, reco_named, truth_named)
+        error_groups[key] += 1
+
+    # Build sizes and legend labels
+    sizes = []
+    legend_labels = []
+    for (pattern_named, reco_named, truth_named), count in error_groups.items():
+        sizes.append(count)
+        label = (
+            r"$\text{Pattern Particles: }" + generate_particle_label(Counter(dict(pattern_named))) + r"$" + "\n" +
+            r"$\text{Tracklet Particles: }" + generate_particle_label(Counter(dict(reco_named))) + r"$" + "\n" +
+            r"$\text{Truth Particles: }" + generate_particle_label(Counter(dict(truth_named))) + r"$"
+        )
+        legend_labels.append(label)
+
+    # Sort
+    sorted_indices = sorted(range(len(sizes)), key=lambda i: sizes[i], reverse=True)
+    sizes = [sizes[i] for i in sorted_indices]
+    legend_labels = [legend_labels[i] for i in sorted_indices]
+
+    if len(legend_labels) > max_labels:
+        other_size = sum(sizes[max_labels:])
+        sizes = sizes[:max_labels] + [other_size]
+        legend_labels = legend_labels[:max_labels] + [r"$\text{Other}$"]
+
+    total = sum(sizes)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    wedges, _, autotexts = ax.pie(
+        sizes,
+        labels=[f"Group {i+1}" for i in range(len(sizes))],
+        autopct=lambda p: f'{p:.1f}% ({int(round(p * total / 100))})' if p > 1 else '',
+        textprops={'fontsize': 9},
+        startangle=140,
+    )
+
+    # Legend with LaTeX
+    ax.legend(wedges, legend_labels, title="Event Types", loc="center left", bbox_to_anchor=(1, 0.5), fontsize=8)
+
+    # Title
+    if title is None:
+        title = f"Misclassified Events by Composition\n$N_{{\\text{{incorrect}}}} = {total}$"
+    ax.set_title(title)
+
     plt.tight_layout()
     plt.show()
 

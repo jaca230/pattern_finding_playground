@@ -5,6 +5,6 @@ from models.vertex import Vertex
 
 class VertexFormer(ABC):
     @abstractmethod
-    def form_vertices(self, tracklets: Set[Tracklet]) -> Set[Vertex]:
+    def form_vertices(self, tracklets: Set[Tracklet]) -> tuple[Set[Vertex], dict]:
         pass
 

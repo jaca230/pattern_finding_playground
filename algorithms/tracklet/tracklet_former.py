@@ -4,7 +4,7 @@ from models.tracklet import Tracklet
 
 class TrackletFormer(ABC):
     @abstractmethod
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> List[Tracklet]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
         """
         Forms a list of Tracklet objects from the given tree and geoHelper at a specified entry.
 

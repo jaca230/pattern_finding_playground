@@ -6,5 +6,5 @@ from models.vertex import Vertex
 
 class PatternFormer(ABC):
     @abstractmethod
-    def form_patterns(self, vertices: Set[Vertex]) -> Set[Pattern]:
+    def form_patterns(self, vertices: Set[Vertex]) -> tuple[Set[Pattern], dict]:
         pass

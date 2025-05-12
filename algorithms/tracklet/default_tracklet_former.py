@@ -1,4 +1,4 @@
-from typing import List, Any, Tuple, Optional
+from typing import List, Any, Optional
 from collections import Counter
 from models.tracklet import Tracklet
 from models.hit import Hit
@@ -8,7 +8,7 @@ class DefaultTrackletFormer(TrackletFormer):
     def __init__(self, truth_tree: Optional[Any] = None):
         self.truth_tree = truth_tree
 
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> Tuple[List[Tracklet], dict]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
         tree.GetEntry(entry_index)
         if self.truth_tree:
             self.truth_tree.GetEntry(entry_index)
