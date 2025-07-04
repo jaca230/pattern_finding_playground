@@ -1,12 +1,12 @@
-from algorithms.validation.event_validator import EventValidator
-from models.event import Event
-from typing import List, Optional, Any
+from deprecated.algorithms.validation.event_validator import EventValidator
+from deprecated.models.event_patterns import EventPatterns
+from typing import List
 
 class TrackletGroupingValidator(EventValidator):
     def __init__(self, verbose: int = 0):
         self.verbose = verbose
 
-    def validate(self, event: Event, storage: Optional[Any] = None) -> bool:
+    def validate(self, event: EventPatterns) -> bool:
         """
         Validates that the tracklet IDs in each reconstructed pattern match the ones
         stored in the truth-level `patterns_truth` from the algorithm_info.

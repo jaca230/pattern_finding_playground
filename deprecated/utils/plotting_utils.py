@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib.colors import LogNorm
 import matplotlib.colors as mcolors
 from collections import Counter, defaultdict
-from models.event import Event
+from deprecated.models.event_patterns import EventPatterns
 from utils.particle_mapping import particle_name_map
 import warnings
 from typing import List
@@ -166,13 +166,13 @@ def plot_energy_view(ax, tracklets):
     ax.set_xlabel("z [mm]")
 
 
-def plot_centroids(ax, event):
+def plot_centroids(ax, event_patterns):
     """
-    Plot centroids for the front and back views if available in events.
+    Plot centroids for the front and back views if available in event_patterns.
     The centroids are shown in magenta with black edges.
     """
-    if 'vertex_algorithm_info' in event.extra_info:
-        vertex_algorithm_info = event.extra_info['vertex_algorithm_info']
+    if 'vertex_algorithm_info' in event_patterns.extra_info:
+        vertex_algorithm_info = event_patterns.extra_info['vertex_algorithm_info']
 
         if 'stats' in vertex_algorithm_info:
             stats = vertex_algorithm_info['stats']
@@ -196,13 +196,8 @@ def plot_centroids(ax, event):
                     )
 
 
-def plot_event(event: Event):
-    if event.get_patterns():
-        # Use pattern tracklets if we're done with patterns
-        tracklets = {t for pattern in event.get_patterns() for t in pattern.get_unique_tracklets()}
-    else:
-        # Use all tracklets if patterns are not available
-        tracklets = event.all_tracklets
+def plot_event(event_patterns: EventPatterns):
+    tracklets = {t for pattern in event_patterns.get_patterns() for t in pattern.get_unique_tracklets()}
 
     fig, ax = plt.subplots(
         4, 1, figsize=(12, 10),
@@ -215,7 +210,7 @@ def plot_event(event: Event):
     plot_time_view(ax[2], tracklets)
     plot_energy_view(ax[3], tracklets)
 
-    plot_centroids([ax[0], ax[1]], event)
+    plot_centroids([ax[0], ax[1]], event_patterns)
 
     for a in ax:
         a.set_xlim(-0.5, 7)  # Set z-limits
@@ -236,12 +231,12 @@ def generate_particle_label(counter: Counter) -> str:
     """Generate a readable label from a Counter of particle names."""
     return ' + '.join(f'{v}{k}' if v > 1 else k for k, v in sorted(counter.items()))
 
-def plot_event_classification_from_patterns(events, particle_source="pattern_reco", title=None, use_truth_particles=None):
+def plot_event_classification_from_patterns(event_patterns_list, particle_source="pattern_reco", title=None, use_truth_particles=None):
     """
     Classify events based on particle composition and plot validation success.
 
     Parameters:
-    - events: list of Events
+    - event_patterns_list: list of EventPatterns
     - particle_source: one of {"truth", "reco", "pattern_reco"}
     - title: optional plot title
     - use_truth_particles: deprecated, use `particle_source='truth'` instead
@@ -262,14 +257,14 @@ def plot_event_classification_from_patterns(events, particle_source="pattern_rec
 
     bins = defaultdict(list)
 
-    for event in events:
+    for ep in event_patterns_list:
         if particle_source == "truth":
-            pid_counter = event.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_truth", Counter())
+            pid_counter = ep.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_truth", Counter())
         elif particle_source == "reco":
-            pid_counter = event.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_reco", Counter())
+            pid_counter = ep.extra_info.get("tracklet_algorithm_info", {}).get("particles_in_event_reco", Counter())
         else:  # "pattern_reco"
             tracklets = {
-                t for pattern in event.get_patterns()
+                t for pattern in ep.get_patterns()
                 for vertex in pattern.get_vertices()
                 for t in vertex.get_tracklets()
             }
@@ -280,7 +275,7 @@ def plot_event_classification_from_patterns(events, particle_source="pattern_rec
             for pid, count in pid_counter.items()
         })
 
-        bins[frozenset(particle_counts.items())].append(event)
+        bins[frozenset(particle_counts.items())].append(ep)
 
     # Prepare plotting bins
     bin_labels = []
@@ -289,10 +284,10 @@ def plot_event_classification_from_patterns(events, particle_source="pattern_rec
     failed_counts = []
     correctness_percentages = []
 
-    for particle_counter, events in bins.items():
+    for particle_counter, eps in bins.items():
         label = generate_particle_label(Counter(dict(particle_counter)))
-        total = len(events)
-        correct = sum(1 for event in events if event.is_valid)
+        total = len(eps)
+        correct = sum(1 for ep in eps if ep.validate())
         failed = total - correct
         percentage = (correct / total) * 100 if total > 0 else 0
 
@@ -327,7 +322,7 @@ def plot_event_classification_from_patterns(events, particle_source="pattern_rec
     ax1.set_ylabel("Event Count")
     if title is None:
         title = f"Pattern Reconstruction by Particle Composition ({particle_source})\n" \
-                f"$N_{{\\text{{events}}}} = {len(events)}$"
+                f"$N_{{\\text{{events}}}} = {len(event_patterns_list)}$"
     ax1.set_title(title)
     ax1.legend()
     ax1.set_yscale('log')
@@ -415,7 +410,7 @@ def plot_info_box(ax, conf_matrix, total):
     ax.text(0.1, 0.5, f'Performance: {performance:.2%}', fontsize=16)
 
 
-def plot_event_patterns_summary(events: List[Event], title: str):
+def plot_event_patterns_summary(events: List[EventPatterns], title: str):
     n_truth = []
     n_reco = []
     passed = []
@@ -424,7 +419,7 @@ def plot_event_patterns_summary(events: List[Event], title: str):
     for event in events:
         truth_count = event.extra_info.get("tracklet_algorithm_info", {}).get("n_patterns_truth", 0)
         reco_count = len(event.get_patterns())
-        valid = event.is_valid
+        valid = event.validate()
         count_match = reco_count == truth_count
 
         n_truth.append(truth_count)
@@ -457,13 +452,13 @@ def plot_event_patterns_summary(events: List[Event], title: str):
     plt.tight_layout()
     plt.show()
 
-def plot_incorrect_event_misclassification_pie(events, max_labels=10, title=None):
+def plot_incorrect_event_misclassification_pie(event_patterns_list, max_labels=10, title=None):
     """
     Plots a pie chart of incorrect event classifications.
     Each slice corresponds to a unique (pattern_reco, reco, truth) particle composition triplet.
 
     Parameters:
-    - events: list of Events
+    - event_patterns_list: list of EventPatterns
     - max_labels: maximum number of pie slices to label explicitly
     - title: optional title for the plot
     """
@@ -472,16 +467,16 @@ def plot_incorrect_event_misclassification_pie(events, max_labels=10, title=None
 
     error_groups = Counter()
 
-    for event in events:
-        if event.is_valid:
+    for ep in event_patterns_list:
+        if ep.validate():
             continue
 
-        info = event.extra_info.get("tracklet_algorithm_info", {})
+        info = ep.extra_info.get("tracklet_algorithm_info", {})
         truth_counter = info.get("particles_in_event_truth", Counter())
         reco_counter = info.get("particles_in_event_reco", Counter())
 
         tracklets = {
-            t for pattern in event.get_patterns()
+            t for pattern in ep.get_patterns()
             for vertex in pattern.get_vertices()
             for t in vertex.get_tracklets()
         }

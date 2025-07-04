@@ -4,8 +4,8 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Ignore deprecated folder
-deprecated/
+# Ignore recycle bin folder
+recycle_bin/
 
 # Ignore data folder
 data/

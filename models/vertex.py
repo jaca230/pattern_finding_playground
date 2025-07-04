@@ -16,11 +16,3 @@ class Vertex:
     def __repr__(self) -> str:
         return f"Vertex(id={self.vertex_id}, num_tracklets={len(self.tracklets)})"
 
-    def __eq__(self, other):
-        if not isinstance(other, Vertex):
-            return NotImplemented
-        return self.tracklets == other.tracklets
-
-    def __hash__(self):
-        # Hash only on the tracklets, since that's how we're defining equality
-        return hash(frozenset(self.tracklets))

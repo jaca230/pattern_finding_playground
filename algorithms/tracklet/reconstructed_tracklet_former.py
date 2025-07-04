@@ -9,7 +9,7 @@ class ReconstructedTrackletFormer(TrackletFormer):
     def __init__(self, truth_tree: Optional[Any] = None):
         self.truth_tree = truth_tree  # Can be None if truth info is unavailable
 
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int, storage: Optional[Any] = None) -> tuple[List[Tracklet], dict]:
         tree.GetEntry(entry_index)
         if self.truth_tree:
             self.truth_tree.GetEntry(entry_index)

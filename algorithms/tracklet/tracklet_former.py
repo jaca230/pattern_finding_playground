@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Optional
 from models.tracklet import Tracklet
 
 class TrackletFormer(ABC):
     @abstractmethod
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int, storage: Optional[Any] = None) -> tuple[List[Tracklet], dict]:
         """
         Forms a list of Tracklet objects from the given tree and geoHelper at a specified entry.
 

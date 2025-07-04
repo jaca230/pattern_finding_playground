@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from typing import Set, Optional
+from typing import Set, Optional, Any, Tuple
 from models.tracklet import Tracklet
 from models.vertex import Vertex
 from algorithms.vertex.vertex_former import VertexFormer
@@ -279,7 +279,7 @@ class KMeansVertexFormer(VertexFormer):
 
         return vertices
     
-    def form_vertices(self, tracklets: Set[Tracklet]) -> tuple[Set[Vertex], dict]:
+    def form_vertices(self, tracklets: Set[Tracklet], storage: Optional[Any] = None) -> Tuple[Set[Vertex], dict]:
         """Find vertices for the given set of tracklets using the constrained k-means algorithm."""
 
         tracklets = list(tracklets)

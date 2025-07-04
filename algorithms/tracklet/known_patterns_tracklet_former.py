@@ -9,7 +9,7 @@ class KnownPatternsTrackletFormer(TrackletFormer):
     def __init__(self, truth_tree: Optional[Any] = None):
         self.truth_tree = truth_tree
 
-    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int) -> tuple[List[Tracklet], dict]:
+    def form_tracklets(self, tree: Any, geoHelper: Any, entry_index: int, storage: Optional[Any] = None) -> tuple[List[Tracklet], dict]:
         # Get entries from the main tree and truth tree (if provided)
         tree.GetEntry(entry_index)
         if self.truth_tree:

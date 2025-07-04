@@ -113,4 +113,3 @@ def fit_tracklet_hits(hits: List[Hit]) -> dict:
     }
 
     return fit_results
-

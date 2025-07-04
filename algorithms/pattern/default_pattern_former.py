@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, Optional, Any
 from models.pattern import Pattern
 from models.vertex import Vertex
 from algorithms.pattern.pattern_former import PatternFormer
@@ -9,7 +9,7 @@ class DefaultPatternFormer(PatternFormer):
         """DefaultPatternFormer uses connected component analysis based on shared tracklets."""
         pass
 
-    def form_patterns(self, vertices: Set[Vertex]) -> tuple[Set[Pattern], dict]:
+    def form_patterns(self, vertices: Set[Vertex], storage: Optional[Any] = None) -> tuple[Set[Pattern], dict]:
         """
         Forms patterns by identifying connected components in the vertex graph.
         Two vertices are connected if they share at least one tracklet.

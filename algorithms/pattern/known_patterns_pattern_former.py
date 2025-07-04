@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, Optional, Any
 from models.pattern import Pattern
 from models.vertex import Vertex
 from algorithms.pattern.pattern_former import PatternFormer
@@ -9,7 +9,7 @@ class KnownPatternsPatternFormer(PatternFormer):
         """KnownPatternsPatternFormer forms patterns based on the 'pattern_reco' information stored in the tracklet's extra_info."""
         pass
 
-    def form_patterns(self, vertices: Set[Vertex]) -> tuple[Set[Pattern], dict]:
+    def form_patterns(self, vertices: Set[Vertex], storage: Optional[Any] = None) -> tuple[Set[Pattern], dict]:
         """
         Forms patterns based on the 'pattern_reco' information in tracklet's extra_info.
         Each tracklet’s 'pattern_reco' extra_info indicates which pattern it belongs to.

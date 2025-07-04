@@ -1,4 +1,4 @@
-from typing import Set, Optional, List
+from typing import Optional, Set, Any, Tuple, List
 from models.tracklet import Tracklet
 from models.vertex import Vertex
 from algorithms.vertex.vertex_types.vertex_type import VertexType
@@ -16,7 +16,7 @@ class TypeScoringVertexFormer(VertexFormer):
         # Use the predefined vertex types as the default
         return [PionMuonVertex(), PionPositronVertex(), MuonPositronVertex()]
 
-    def form_vertices(self, tracklets: Set[Tracklet]) -> Set[Vertex]:
+    def form_vertices(self, tracklets: Set[Tracklet], storage: Optional[Any] = None) -> Tuple[Set[Vertex], dict]:
         formed_vertices: Set[Vertex] = set()
 
         for seed_tracklet in tracklets:
