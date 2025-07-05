@@ -1,7 +1,6 @@
-# pipeline/stages/input_stage.py
-
 from pipeline.staging.stage import Stage
 from enums.default_stages import DefaultStages
+from pipeline.staging.stage import monitor_stage_performance
 
 class EventInputStage(Stage):
     def __init__(self):
@@ -13,8 +12,9 @@ class EventInputStage(Stage):
         )
 
     def build_handler(self):
-        # handler accepts storage and input_context
+        @monitor_stage_performance(stage_name=self.name)
         def handler(storage, input_context):
+            # Direct assignment - minimal overhead
             storage["tree"] = input_context.tree
             storage["geo"] = input_context.geo
             storage["entry_index"] = input_context.entry_index
@@ -22,6 +22,8 @@ class EventInputStage(Stage):
 
 # Simple class to hold inputs for EventInputStage runs
 class InputContext:
+    __slots__ = ('tree', 'geo', 'entry_index')  # Memory optimization
+    
     def __init__(self, tree, geo, entry_index):
         self.tree = tree
         self.geo = geo
