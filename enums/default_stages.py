@@ -1,10 +1,10 @@
-"""Default stages for backward compatibility - users can define their own."""
-from enum import Enum, auto
+"""Default stages users can insert/define their own stages in between"""
+from enum import Enum
 
 class DefaultStages(Enum):
-    INPUT = auto()
-    EVENT_INIT = auto()
-    TRACKLETS = auto()
-    VERTICES = auto()
-    PATTERNS = auto()
-    VALIDATION = auto()
+    INPUT = 100
+    EVENT_INIT = 200
+    TRACKLETS = 300
+    VERTICES = 400
+    PATTERNS = 500
+    VALIDATION = 600
