@@ -82,16 +82,21 @@ def plot_y_view(ax, tracklets):
             ax.plot([ep0.z, ep1.z], [ep0.y, ep1.y], color=darken_color(color, 0.3), linestyle='-', linewidth=3, alpha=0.7)
 
 
-def plot_time_view(ax, tracklets, time_gap_threshold=0.2, gap_percentage=0.1):
+def plot_time_view(ax, tracklets, time_gap_threshold=0.3, gap_percentage=0.1):
     ax.set_ylabel("Time [ns]")
 
-    all_hits = sorted([hit for t in tracklets for hit in t.hits], key=lambda h: h.time)
+    # Flatten all hits, sorted by time, and keep their tracklet association
+    all_hits = []
+    for tracklet in tracklets:
+        for hit in tracklet.hits:
+            all_hits.append((hit, tracklet.particle_color))
+    all_hits.sort(key=lambda pair: pair[0].time)
 
     # Group hits by time
     grouped_hits = []
     group = [all_hits[0]]
     for prev, curr in zip(all_hits, all_hits[1:]):
-        if abs(curr.time - prev.time) > time_gap_threshold:
+        if abs(curr[0].time - prev[0].time) > time_gap_threshold:
             grouped_hits.append(group)
             group = [curr]
         else:
@@ -104,9 +109,9 @@ def plot_time_view(ax, tracklets, time_gap_threshold=0.2, gap_percentage=0.1):
     cumulative_offset = 0
 
     for group in grouped_hits:
-        t0 = min(hit.time for hit in group)
-        t1 = max(hit.time for hit in group)
-        normalized_times.extend([hit.time - t0 + cumulative_offset for hit in group])
+        t0 = min(hit.time for hit, _ in group)
+        t1 = max(hit.time for hit, _ in group)
+        normalized_times.extend([hit.time - t0 + cumulative_offset for hit, _ in group])
         group_min_times.append(t0 + cumulative_offset)
         group_max_times.append(t1 + cumulative_offset)
         cumulative_offset += t1 - t0
@@ -119,9 +124,9 @@ def plot_time_view(ax, tracklets, time_gap_threshold=0.2, gap_percentage=0.1):
     cumulative_offset = 0
 
     for i, group in enumerate(grouped_hits):
-        t0 = min(hit.time for hit in group)
-        t1 = max(hit.time for hit in group)
-        normalized_times_with_gap.extend([hit.time - t0 + cumulative_offset for hit in group])
+        t0 = min(hit.time for hit, _ in group)
+        t1 = max(hit.time for hit, _ in group)
+        normalized_times_with_gap.extend([hit.time - t0 + cumulative_offset for hit, _ in group])
         adjusted_group_ends.append((cumulative_offset, cumulative_offset + t1 - t0))
         cumulative_offset += (t1 - t0) + gap_size
 
@@ -130,8 +135,9 @@ def plot_time_view(ax, tracklets, time_gap_threshold=0.2, gap_percentage=0.1):
             ax.fill_betweenx([cumulative_offset - gap_size, cumulative_offset],
                              z_min, z_max, color='gray', alpha=0.2, hatch='//')
 
-    zs = [hit.z for hit in all_hits]
-    colors = [hit.particle_color for hit in all_hits]
+    zs = [hit.z for hit, _ in all_hits]
+    colors = [color for _, color in all_hits]
+
     ax.scatter(zs, normalized_times_with_gap, c=colors, alpha=0.7)
     ax.set_xlim([0, max(zs) + 2])
 
@@ -155,15 +161,16 @@ def plot_energy_view(ax, tracklets):
 
     for tracklet in tracklets:
         color = tracklet.particle_color
-        front_hits = tracklet.get_front_hits()
-        ax.scatter([hit.z for hit in front_hits],
-                   [hit.energy for hit in front_hits],
+        all_hits = tracklet.hits  # Use all hits, not just front
+        ax.scatter([hit.z for hit in all_hits],
+                   [hit.energy for hit in all_hits],
                    color=color,
                    alpha=0.7,
                    label=f"${tracklet.particle_name}$")
     
     ax.set_yscale('log')
     ax.set_xlabel("z [mm]")
+
 
 
 def plot_centroids(ax, event):
@@ -230,7 +237,6 @@ def plot_event(event: Event):
     plt.show()
 
     return fig, ax
-
 
 def generate_particle_label(counter: Counter) -> str:
     """Generate a readable label from a Counter of particle names."""
