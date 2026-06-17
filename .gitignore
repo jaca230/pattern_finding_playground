@@ -13,6 +13,9 @@ data/
 # Ignore Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
+# Ignore local artifacts
+.artifacts/
+
 # Ignore environment directories
 env/
 venv/
