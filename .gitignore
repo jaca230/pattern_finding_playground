@@ -4,17 +4,19 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Ignore recycle bin folder
-recycle_bin/
+# Ignore local archive folders
+.deprecated/
 
-# Ignore data folder
-data/
+# Ignore local data folders
+.data/
 
 # Ignore Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
-# Ignore local artifacts
-.artifacts/
+# Ignore generated local artifacts
+.artifacts/notebook_smoke/
+.artifacts/.ipynb_checkpoints/
+.artifacts/__pycache__/
 
 # Ignore environment directories
 env/
