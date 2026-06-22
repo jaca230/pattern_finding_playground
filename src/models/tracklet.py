@@ -1,6 +1,5 @@
 from typing import List, Optional, Callable
 from models.hit import Hit
-from figures.utils import particle_name_map
 from models.point_3d import Point3D  # Make sure this import is correct
 
 
@@ -19,16 +18,10 @@ class Tracklet:
         self.particle_id = particle_id
         self.e_id = e_id
         self.hits = hits
-        self.particle_name, self.particle_color = self.get_particle_info(particle_id)
         self.fitter = fitter
         self.endpoint_0 = endpoint_0
         self.endpoint_1 = endpoint_1
         self.extra_info: dict = {}  # <-- general-purpose storage
-
-    def get_particle_info(self, particle_id: int):
-        """Retrieves the particle name and color based on the particle ID."""
-        particle_info = particle_name_map.get(particle_id, particle_name_map['default'])
-        return particle_info['name'], particle_info['color']
 
     def get_front_hits(self) -> List[Hit]:
         """Returns the hits from the front detector side."""
@@ -68,7 +61,6 @@ class Tracklet:
         extra_info_keys = list(self.extra_info.keys()) if self.extra_info else None
         return (
             f"Tracklet(id={self.tracklet_id}, particle_id={self.particle_id}, "
-            f"name={self.particle_name}, color={self.particle_color}, "
             f"e_id={self.e_id}, hits={len(self.hits)}, "
             f"extra_info_keys={extra_info_keys}"
             f"{endpoint_repr})"

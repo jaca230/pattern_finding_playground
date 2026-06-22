@@ -10,7 +10,7 @@ PARTICLE_STYLES = {
     "default": {"name": "Unknown", "color": "#B0B0B0"},
 }
 
-# Backward-compatible alias for model code that wants the raw mapping.
+# Backward-compatible name for code that wants the raw mapping.
 particle_name_map = PARTICLE_STYLES
 
 

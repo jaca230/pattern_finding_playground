@@ -8,24 +8,24 @@ from models.point_3d import Point3D
 class ReconstructedTrackletFormer(TrackletFormer):
     def form_tracklets(
         self,
-        reco_event: Any,
-        geoHelper: Any,
+        reco_entry: Any,
+        geo: Any,
         storage: Optional[Any] = None,
-        truth_event: Optional[Any] = None,
+        truth_entry: Optional[Any] = None,
     ) -> tuple[List[Tracklet], dict]:
         tracklets = []
         tracklet_counter = 0
         reco_particles_counter = Counter()
 
-        for index, tracklet in enumerate(reco_event.tracklets):
-            particle_id = tracklet.pid
+        for index, tracklet in enumerate(reco_entry["tracklets"]):
+            particle_id = int(tracklet.GetPID())
             reco_particles_counter[particle_id] += 1
-            e_id = tracklet.eid
+            e_id = int(tracklet.GetEID())
             hits = []
 
-            for hit in tracklet.hits:
+            for hit in self._root_tracklet_hits(tracklet, reco_entry["hits"]):
                 vid = hit.GetVID()
-                vname = geoHelper.GetVolumeName(vid).Data()
+                vname = geo.GetVolumeName(vid).Data()
 
                 if 'atar' not in vname:
                     continue
@@ -38,9 +38,9 @@ class ReconstructedTrackletFormer(TrackletFormer):
                         detector_side = 'back'
 
                 hit_obj = Hit(
-                    z=geoHelper.GetZ(vid) + 0.07,
-                    x=geoHelper.GetX(vid),
-                    y=geoHelper.GetY(vid),
+                    z=geo.GetZ(vid) + 0.07,
+                    x=geo.GetX(vid),
+                    y=geo.GetY(vid),
                     time=hit.GetObservedTime(),
                     energy=hit.GetObservedEdep(),
                     particle_id=hit.GetPID(),
@@ -48,8 +48,8 @@ class ReconstructedTrackletFormer(TrackletFormer):
                 )
                 hits.append(hit_obj)
 
-            start_point = tracklet.start_point
-            stop_point = tracklet.stop_point
+            start_point = tracklet.GetStartPoint()
+            stop_point = tracklet.GetStopPoint()
             point_0 = Point3D(start_point.X(), start_point.Y(), start_point.Z())
             point_1 = Point3D(stop_point.X(), stop_point.Y(), stop_point.Z())
 
@@ -63,22 +63,21 @@ class ReconstructedTrackletFormer(TrackletFormer):
             tracklets.append(t)
             tracklet_counter += 1
 
-        # Determine which tree to use for truth info
-        truth_source = truth_event if truth_event is not None else reco_event
+        truth_source = truth_entry if truth_entry is not None else reco_entry
 
         n_patterns_truth = 0
         particles_counter = Counter()
         patterns_truth = {}
 
-        for pattern_idx, pattern in enumerate(truth_source.patterns):
+        for pattern_idx, pattern in enumerate(truth_source["patterns"]):
             n_patterns_truth += 1
             indices = pattern.GetTrackletIndices()
             pattern_tracklet_ids = []
 
             for index in indices:
                 index = int(index)
-                tracklet = truth_source.tracklets[index]
-                particle_id = tracklet.pid
+                tracklet = truth_source["tracklets"][index]
+                particle_id = int(tracklet.GetPID())
 
                 particles_counter[particle_id] += 1
                 pattern_tracklet_ids.append(index)

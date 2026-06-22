@@ -7,22 +7,22 @@ from algorithms.tracklet.tracklet_former import TrackletFormer
 class DefaultTrackletFormer(TrackletFormer):
     def form_tracklets(
         self,
-        reco_event: Any,
-        geoHelper: Any,
+        reco_entry: Any,
+        geo: Any,
         storage: Optional[Any] = None,
-        truth_event: Optional[Any] = None,
+        truth_entry: Optional[Any] = None,
     ) -> tuple[List[Tracklet], dict]:
         tracklets = []
         tracklet_counter = 0
 
-        for index, tracklet in enumerate(reco_event.tracklets):
-            particle_id = tracklet.pid
-            e_id = tracklet.eid
+        for index, tracklet in enumerate(reco_entry["tracklets"]):
+            particle_id = int(tracklet.GetPID())
+            e_id = int(tracklet.GetEID())
             hits = []
 
-            for hit in tracklet.hits:
+            for hit in self._root_tracklet_hits(tracklet, reco_entry["hits"]):
                 vid = hit.GetVID()
-                vname = geoHelper.GetVolumeName(vid).Data()
+                vname = geo.GetVolumeName(vid).Data()
 
                 if 'atar' not in vname:
                     continue
@@ -35,9 +35,9 @@ class DefaultTrackletFormer(TrackletFormer):
                         detector_side = 'back'
 
                 hit_obj = Hit(
-                    z=geoHelper.GetZ(vid) + 0.07,
-                    x=geoHelper.GetX(vid),
-                    y=geoHelper.GetY(vid),
+                    z=geo.GetZ(vid) + 0.07,
+                    x=geo.GetX(vid),
+                    y=geo.GetY(vid),
                     time=hit.GetObservedTime(),
                     energy=hit.GetObservedEdep(),
                     particle_id=hit.GetPID(),
@@ -55,21 +55,20 @@ class DefaultTrackletFormer(TrackletFormer):
                 hits=hits
             ))
 
-        # Use truth tree if provided, otherwise default to the current tree
-        truth_source = truth_event if truth_event is not None else reco_event
+        truth_source = truth_entry if truth_entry is not None else reco_entry
 
         n_patterns_truth = 0
         particles_counter = Counter()
         patterns_truth = {}
 
-        for pattern_idx, pattern in enumerate(truth_source.patterns):
+        for pattern_idx, pattern in enumerate(truth_source["patterns"]):
             n_patterns_truth += 1
             indices = pattern.GetTrackletIndices()
             pattern_tracklet_ids = []
 
             for index in indices:
-                tracklet = truth_source.tracklets[int(index)]
-                particle_id = tracklet.pid
+                tracklet = truth_source["tracklets"][int(index)]
+                particle_id = int(tracklet.GetPID())
 
                 particles_counter[particle_id] += 1
                 pattern_tracklet_ids.append(int(index))

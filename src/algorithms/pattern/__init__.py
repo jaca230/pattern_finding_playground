@@ -1,0 +1,1 @@
+"""Pattern-forming algorithm implementations."""

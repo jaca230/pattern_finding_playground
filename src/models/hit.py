@@ -1,5 +1,4 @@
 from typing import Optional
-from figures.utils import particle_name_map
 
 class Hit:
     def __init__(
@@ -31,24 +30,16 @@ class Hit:
         if detector_side not in ['front', 'back', None]:
             raise ValueError("detector_side must be either 'f' (front) or 'b' (back).")
         
-        self.particle_id = particle_id
-        self.particle_name, self.particle_color = self.get_particle_info(particle_id)
-
         self.x = x
         self.y = y
         self.z = z
         self.time = time
         self.energy = energy
+        self.particle_id = particle_id
         self.detector_side = detector_side
-
-    def get_particle_info(self, particle_id: int):
-        """Retrieves the particle name and color based on the particle ID."""
-        particle_info = particle_name_map.get(particle_id, particle_name_map['default'])
-        return particle_info['name'], particle_info['color']
 
     def __repr__(self) -> str:
         return (
-            f"Hit(particle_id={self.particle_id}, name={self.particle_name}, "
-            f"color={self.particle_color}, x={self.x}, y={self.y}, z={self.z}, "
+            f"Hit(particle_id={self.particle_id}, x={self.x}, y={self.y}, z={self.z}, "
             f"time={self.time}, energy={self.energy}, detector_side={self.detector_side})"
         )

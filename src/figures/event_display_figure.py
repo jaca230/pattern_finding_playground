@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from figures.figure import PlotFigure
+from figures.utils import particle_style
 from models.event import Event
 
 
@@ -48,6 +49,9 @@ class EventDisplayFigure(PlotFigure):
         darkened_color = np.clip(color * factor, 0, 1)
         return mcolors.rgb2hex(darkened_color)
 
+    def _tracklet_style(self, tracklet):
+        return particle_style(tracklet.particle_id)
+
     def _draw_dashed_lines(self, ax, dz_total=(0.139 + 0.149), start=0, step=2, y_ranges=None):
         step_size = dz_total / 2.0
         z_positions = np.arange(start, 7, step_size * step)
@@ -77,14 +81,15 @@ class EventDisplayFigure(PlotFigure):
         self._draw_dashed_lines(ax, start=0, step=2)
 
         for tracklet in tracklets:
-            color = tracklet.particle_color
+            style = self._tracklet_style(tracklet)
+            color = style["color"]
             front_hits = tracklet.get_front_hits()
             ax.scatter(
                 [hit.z for hit in front_hits],
                 [hit.x for hit in front_hits],
                 color=color,
                 alpha=0.7,
-                label=f"${tracklet.particle_name}$",
+                label=f"${style['name']}$",
             )
 
             ep0, ep1 = tracklet.get_endpoints()
@@ -104,14 +109,15 @@ class EventDisplayFigure(PlotFigure):
         self._draw_dashed_lines(ax, start=(0.139 + 0.149) / 2, step=2)
 
         for tracklet in tracklets:
-            color = tracklet.particle_color
+            style = self._tracklet_style(tracklet)
+            color = style["color"]
             back_hits = tracklet.get_back_hits()
             ax.scatter(
                 [hit.z for hit in back_hits],
                 [hit.y for hit in back_hits],
                 color=color,
                 alpha=0.7,
-                label=f"${tracklet.particle_name}$",
+                label=f"${style['name']}$",
             )
 
             ep0, ep1 = tracklet.get_endpoints()
@@ -131,8 +137,9 @@ class EventDisplayFigure(PlotFigure):
 
         all_hits = []
         for tracklet in tracklets:
+            color = self._tracklet_style(tracklet)["color"]
             for hit in tracklet.hits:
-                all_hits.append((hit, tracklet.particle_color))
+                all_hits.append((hit, color))
         all_hits.sort(key=lambda pair: pair[0].time)
 
         if not all_hits:
@@ -200,13 +207,14 @@ class EventDisplayFigure(PlotFigure):
         self._draw_dashed_lines(ax, start=0, step=1)
 
         for tracklet in tracklets:
-            color = tracklet.particle_color
+            style = self._tracklet_style(tracklet)
+            color = style["color"]
             ax.scatter(
                 [hit.z for hit in tracklet.hits],
                 [hit.energy for hit in tracklet.hits],
                 color=color,
                 alpha=0.7,
-                label=f"${tracklet.particle_name}$",
+                label=f"${style['name']}$",
             )
 
         ax.set_yscale("log")
