@@ -9,7 +9,9 @@ class Hit:
         y: Optional[float] = None,
         time: Optional[float] = None,
         energy: Optional[float] = None,
-        detector_side: Optional[str] = None  # Can be 'f' or 'b' indicating front or back
+        detector_side: Optional[str] = None,  # Can be 'front' or 'back'
+        volume_id: Optional[int] = None,
+        volume_name: Optional[str] = None,
     ):
         """
         Represents a single detector hit in a strip-based system (x-z or y-z).
@@ -37,9 +39,12 @@ class Hit:
         self.energy = energy
         self.particle_id = particle_id
         self.detector_side = detector_side
+        self.volume_id = volume_id
+        self.volume_name = volume_name
 
     def __repr__(self) -> str:
         return (
             f"Hit(particle_id={self.particle_id}, x={self.x}, y={self.y}, z={self.z}, "
-            f"time={self.time}, energy={self.energy}, detector_side={self.detector_side})"
+            f"time={self.time}, energy={self.energy}, detector_side={self.detector_side}, "
+            f"volume_id={self.volume_id})"
         )

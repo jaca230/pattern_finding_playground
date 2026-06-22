@@ -2,8 +2,8 @@ from collections import Counter
 
 import matplotlib.pyplot as plt
 
+from figures.event_display.styles import particle_name_map
 from figures.figure import PlotFigure
-from figures.utils import particle_name_map
 from models.event import Event
 
 

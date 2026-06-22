@@ -18,8 +18,11 @@ class VertexStage(Stage):
             # Call the algorithm
             vertices, info = self.vertex_former.form_vertices(tracklets, storage=storage)
 
-            # Direct assignment - vertices are likely already optimized collections
-            storage["vertices"] = vertices
+            # Keep the storage set stable so Event.all_vertices remains live
+            # during partial-stage notebook displays.
+            storage_vertices = storage.setdefault("vertices", set())
+            storage_vertices.clear()
+            storage_vertices.update(vertices)
             
             # Use setdefault to avoid double lookup
             storage.setdefault("extra_info", {})["vertex_algorithm_info"] = info

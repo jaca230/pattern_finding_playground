@@ -84,6 +84,8 @@ class PFDefaultTrackletFormer(TrackletFormer):
                     energy=hit.GetObservedEdep(),
                     particle_id=hit.GetPID(),
                     detector_side=detector_side,
+                    volume_id=int(vid),
+                    volume_name=volume_name,
                 )
             )
 

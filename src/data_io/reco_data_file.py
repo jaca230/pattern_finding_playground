@@ -42,6 +42,8 @@ class RecoDataFile:
         *,
         ntuple_name: str = "rec",
         prefix_map: Mapping[str, str | None] | None = None,
+        truth_prefix_map: Mapping[str, str | None] | None = None,
+        load_truth: bool = True,
         pattern_prefix: str | None = None,
         tracklet_prefix: str | None = None,
         fit_result_prefix: str | None = None,
@@ -61,6 +63,11 @@ class RecoDataFile:
         self.tracklet_prefix = self.prefixes["tracklets"]
         self.fit_result_prefix = self.prefixes["fit_results"]
         self.hit_prefix = self.prefixes["hits"]
+        self.truth_prefixes = (
+            self._resolve_truth_prefixes(truth_prefix_map)
+            if load_truth
+            else None
+        )
         self.cut_flow = cuts if isinstance(cuts, CutFlow) else CutFlow(cuts)
 
         self.root_file = r.TFile(path, "READ")
@@ -79,6 +86,7 @@ class RecoDataFile:
             else None
         )
         self._hit_token = self._entry_obj.GetToken(self.hit_prefix)
+        self._truth_tokens = self._make_truth_tokens(self.truth_prefixes)
 
     def __len__(self) -> int:
         return self._entries
@@ -106,7 +114,13 @@ class RecoDataFile:
         }
         if self._fit_result_token is not None:
             loaded["fit_results"] = self._entry_obj[self._fit_result_token]
+        if self.has_truth_entry:
+            loaded["truth_entry"] = self._load_token_group(self._truth_tokens, entry_index)
         return loaded
+
+    @property
+    def has_truth_entry(self) -> bool:
+        return self._truth_tokens is not None
 
     def add_cut(self, cut) -> None:
         self.cut_flow.add(cut)
@@ -145,6 +159,48 @@ class RecoDataFile:
         if missing:
             raise ValueError(f"Missing required RNTuple prefixes: {missing}")
         return prefixes
+
+    def _resolve_truth_prefixes(self, truth_prefix_map: Mapping[str, str | None] | None) -> dict[str, str | None]:
+        prefixes = dict(self.TRUTH_PREFIXES)
+        if truth_prefix_map is not None:
+            for key, value in truth_prefix_map.items():
+                prefixes[self._normalise_prefix_key(key)] = value
+        return prefixes
+
+    def _make_truth_tokens(self, truth_prefixes: Mapping[str, str | None] | None) -> dict[str, object] | None:
+        if truth_prefixes is None:
+            return None
+
+        tokens = {
+            "patterns": self._optional_token(truth_prefixes["patterns"]),
+            "tracklets": self._optional_token(truth_prefixes["tracklets"]),
+            "hits": self._optional_token(truth_prefixes["hits"]),
+            "fit_results": (
+                self._optional_token(truth_prefixes["fit_results"])
+                if truth_prefixes.get("fit_results") is not None
+                else None
+            ),
+        }
+        if any(tokens[key] is None for key in ("patterns", "tracklets", "hits")):
+            return None
+        return tokens
+
+    def _optional_token(self, field_name: str):
+        try:
+            return self._entry_obj.GetToken(field_name)
+        except Exception:
+            return None
+
+    def _load_token_group(self, tokens: Mapping[str, object], entry_index: int) -> dict:
+        loaded = {
+            "entry_index": entry_index,
+            "patterns": self._entry_obj[tokens["patterns"]],
+            "tracklets": self._entry_obj[tokens["tracklets"]],
+            "hits": self._entry_obj[tokens["hits"]],
+        }
+        if tokens.get("fit_results") is not None:
+            loaded["fit_results"] = self._entry_obj[tokens["fit_results"]]
+        return loaded
 
     def _normalise_prefix_key(self, key: str) -> str:
         normalised = self._PREFIX_ALIASES.get(key, key)

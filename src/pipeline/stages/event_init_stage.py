@@ -21,11 +21,17 @@ class EventInitStage(Stage):
                 storage["extra_info"] = {}
             if "tracklets" not in storage:
                 storage["tracklets"] = set()
+            if "vertices" not in storage:
+                storage["vertices"] = set()
+            if "raw_hits" not in storage:
+                storage["raw_hits"] = []
 
             # Direct reference assignment - no copying
             event.set_patterns(storage["patterns"])
             event.extra_info = storage["extra_info"]
             event.all_tracklets = storage["tracklets"]
+            event.all_vertices = storage["vertices"]
+            event.all_hits = storage["raw_hits"]
 
             storage["event"] = event
         return handler

@@ -41,7 +41,9 @@ class DefaultTrackletFormer(TrackletFormer):
                     time=hit.GetObservedTime(),
                     energy=hit.GetObservedEdep(),
                     particle_id=hit.GetPID(),
-                    detector_side=detector_side
+                    detector_side=detector_side,
+                    volume_id=int(vid),
+                    volume_name=vname,
                 )
                 hits.append(hit_obj)
 
