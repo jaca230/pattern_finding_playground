@@ -1,14 +1,20 @@
 import random
 import numpy as np
 from typing import Set, Optional, Any, Tuple
+from algorithms.registry import register_algorithm
+from algorithms.vertex.vertex_former import VertexFormer
+from algorithms.vertex.kmeans.fit_utils import fit_tracklet_hits
+from collections import defaultdict
+from models.point_3d import Point3D
 from models.tracklet import Tracklet
 from models.vertex import Vertex
-from algorithms.vertex.vertex_former import VertexFormer
-from models.point_3d import Point3D
-from algorithms.vertex.fit_utils import fit_tracklet_hits
-from collections import defaultdict
 from sklearn.cluster import DBSCAN
 
+@register_algorithm(
+    "vertex",
+    name="kmeans",
+    description="Form vertices by clustering tracklet endpoints with a constrained k-means procedure.",
+)
 class KMeansVertexFormer(VertexFormer):
     def __init__(self, n_iters=5, sigma=0.5, plane="front", planes_to_run={"front", "back", "both"}, seed_method = "random"):
         """KMeans-based vertex formation for specified plane: 'front', 'back', or 'both'."""

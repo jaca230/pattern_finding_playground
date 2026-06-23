@@ -1,0 +1,149 @@
+[
+  {
+    "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+    "event_count": 0,
+    "payload": {
+      "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+      "profile": "realistic",
+      "requested_event_count": 0,
+      "loaded_entries": 0,
+      "entries": 727,
+      "file_size_mb": 2.509183883666992,
+      "checkpoints": [
+        {
+          "step": "python_start",
+          "rss_mb": 507.68359375
+        },
+        {
+          "step": "after_pioneer_libraries",
+          "rss_mb": 592.1875
+        },
+        {
+          "step": "after_reco_data_open",
+          "rss_mb": 671.14453125
+        }
+      ]
+    },
+    "summary": {
+      "file_size_mb": 2.509183883666992,
+      "entries": 727,
+      "loaded_entries": 0,
+      "rss_start_mb": 507.68359375,
+      "rss_final_mb": 671.14453125,
+      "delta_total_mb": 163.4609375,
+      "delta_after_pioneer_libraries_mb": 84.50390625,
+      "delta_after_reco_data_open_mb": 163.4609375,
+      "approx_delta_after_first_open_mb": 163.4609375,
+      "approx_delta_after_loaded_entries_mb": 163.4609375,
+      "approx_incremental_per_loaded_entry_mb": 0.0
+    }
+  },
+  {
+    "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+    "event_count": 1,
+    "payload": {
+      "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+      "profile": "realistic",
+      "requested_event_count": 1,
+      "loaded_entries": 1,
+      "entries": 727,
+      "file_size_mb": 2.509183883666992,
+      "checkpoints": [
+        {
+          "step": "python_start",
+          "rss_mb": 508.0625
+        },
+        {
+          "step": "after_pioneer_libraries",
+          "rss_mb": 592.54296875
+        },
+        {
+          "step": "after_reco_data_open",
+          "rss_mb": 671.5078125
+        },
+        {
+          "step": "after_load_entry_0",
+          "rss_mb": 698.8671875
+        }
+      ]
+    },
+    "summary": {
+      "file_size_mb": 2.509183883666992,
+      "entries": 727,
+      "loaded_entries": 1,
+      "rss_start_mb": 508.0625,
+      "rss_final_mb": 698.8671875,
+      "delta_total_mb": 190.8046875,
+      "delta_after_pioneer_libraries_mb": 84.48046875,
+      "delta_after_reco_data_open_mb": 163.4453125,
+      "delta_after_load_entry_0_mb": 190.8046875,
+      "approx_delta_after_first_open_mb": 163.4453125,
+      "approx_delta_after_loaded_entries_mb": 190.8046875,
+      "approx_incremental_per_loaded_entry_mb": 27.359375
+    }
+  },
+  {
+    "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+    "event_count": 5,
+    "payload": {
+      "path": "/workdir/playground/reco_algorithm_tests/.data/current/all_rec.root",
+      "profile": "realistic",
+      "requested_event_count": 5,
+      "loaded_entries": 5,
+      "entries": 727,
+      "file_size_mb": 2.509183883666992,
+      "checkpoints": [
+        {
+          "step": "python_start",
+          "rss_mb": 510.671875
+        },
+        {
+          "step": "after_pioneer_libraries",
+          "rss_mb": 595.29296875
+        },
+        {
+          "step": "after_reco_data_open",
+          "rss_mb": 674.4921875
+        },
+        {
+          "step": "after_load_entry_0",
+          "rss_mb": 702.14453125
+        },
+        {
+          "step": "after_load_entry_1",
+          "rss_mb": 702.21875
+        },
+        {
+          "step": "after_load_entry_2",
+          "rss_mb": 702.22265625
+        },
+        {
+          "step": "after_load_entry_3",
+          "rss_mb": 702.22265625
+        },
+        {
+          "step": "after_load_entry_4",
+          "rss_mb": 702.22265625
+        }
+      ]
+    },
+    "summary": {
+      "file_size_mb": 2.509183883666992,
+      "entries": 727,
+      "loaded_entries": 5,
+      "rss_start_mb": 510.671875,
+      "rss_final_mb": 702.22265625,
+      "delta_total_mb": 191.55078125,
+      "delta_after_pioneer_libraries_mb": 84.62109375,
+      "delta_after_reco_data_open_mb": 163.8203125,
+      "delta_after_load_entry_0_mb": 191.47265625,
+      "delta_after_load_entry_1_mb": 191.546875,
+      "delta_after_load_entry_2_mb": 191.55078125,
+      "delta_after_load_entry_3_mb": 191.55078125,
+      "delta_after_load_entry_4_mb": 191.55078125,
+      "approx_delta_after_first_open_mb": 163.8203125,
+      "approx_delta_after_loaded_entries_mb": 191.55078125,
+      "approx_incremental_per_loaded_entry_mb": 5.54609375
+    }
+  }
+]

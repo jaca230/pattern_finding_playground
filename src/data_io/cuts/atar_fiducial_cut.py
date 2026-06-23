@@ -1,6 +1,16 @@
+from .registry import register_cut
 from .data_cut import DataCut
 
 
+@register_cut(
+    name="atar_fiducial",
+    description="Require reconstructed ATAR tracklet hits to stay inside a simple front/back fiducial window.",
+    parameters={
+        "max_abs_coordinate": "Maximum allowed |x| or |y| in mm for front/back ATAR hits.",
+        "enabled": "Set False to keep the cut in the list without applying it.",
+    },
+    example="AtarFiducialCut(max_abs_coordinate=8.0, enabled=True)",
+)
 class AtarFiducialCut(DataCut):
     """Require ATAR tracklet hits to stay inside a simple front/back fiducial window."""
 

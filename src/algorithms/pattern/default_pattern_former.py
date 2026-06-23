@@ -1,9 +1,15 @@
 from typing import Set, Optional, Any
+from algorithms.registry import register_algorithm
 from models.pattern import Pattern
 from models.vertex import Vertex
 from algorithms.pattern.pattern_former import PatternFormer
 
 
+@register_algorithm(
+    "pattern",
+    name="default",
+    description="Build patterns as connected components in the shared-tracklet vertex graph.",
+)
 class DefaultPatternFormer(PatternFormer):
     def __init__(self):
         """DefaultPatternFormer uses connected component analysis based on shared tracklets."""

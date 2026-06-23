@@ -12,15 +12,15 @@ class TrackletStage(Stage):
 
     def build_handler(self):
         def handler(storage):
-            reco_entry = storage["reco_entry"]
-            truth_entry = storage.get("truth_entry")
+            event_entry = storage["event_entry"]
+            reference_truth_entry = storage.get("reference_truth_entry")
             geo = storage["geo"]
 
             tracklets, info = self.tracklet_former.form_tracklets(
-                reco_entry,
+                event_entry,
                 geo,
                 storage=storage,
-                truth_entry=truth_entry,
+                reference_truth_entry=reference_truth_entry,
             )
 
             # Optimize set operations

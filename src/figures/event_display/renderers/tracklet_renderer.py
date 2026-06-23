@@ -44,9 +44,8 @@ class TrackletRenderer:
         hit_points = self._hit_points_for_tracklet(tracklet, plane)
         line_points = self._straight_line_through_hits(hit_points)
 
-        ep0, ep1 = tracklet.get_endpoints()
-        if ep0 and ep1:
-            endpoint_points = [self._point_for_plane(ep0, plane), self._point_for_plane(ep1, plane)]
+        endpoint_points = self._display_endpoints_for_tracklet(tracklet, plane)
+        if endpoint_points:
             if len(line_points) >= 2:
                 return line_points, endpoint_points, True
             return endpoint_points, endpoint_points, True
@@ -99,31 +98,6 @@ class TrackletRenderer:
             alpha=0.95,
             zorder=9,
         )
-        if config.show_endpoint_labels:
-            self._draw_endpoint_label(ax, stop, "end", color, config, vertical_alignment="bottom")
-
-    def _draw_endpoint_label(
-        self,
-        ax,
-        point: tuple[float, float],
-        label: str,
-        color: str,
-        config,
-        vertical_alignment: str,
-    ) -> None:
-        y_offset = -4 if vertical_alignment == "top" else 4
-        ax.annotate(
-            label,
-            xy=point,
-            xytext=(4, y_offset),
-            textcoords="offset points",
-            color=color,
-            fontsize=config.endpoint_label_fontsize,
-            ha="left",
-            va=vertical_alignment,
-            zorder=11,
-            clip_on=True,
-        )
 
     def _draw_label(self, ax, points, label: str, color: str, config) -> None:
         midpoint = points[len(points) // 2]
@@ -140,12 +114,15 @@ class TrackletRenderer:
             clip_on=True,
         )
 
-    def _point_for_plane(self, point, plane: str) -> tuple[float, float]:
-        if plane == "xz":
-            return point.z, point.x
-        if plane == "yz":
-            return point.z, point.y
-        raise ValueError(f"Unknown plane: {plane}")
+    def _display_endpoints_for_tracklet(self, tracklet, plane: str) -> list[tuple[float, float]]:
+        display_endpoints = tracklet.extra_info.get("display_endpoints")
+        if isinstance(display_endpoints, dict):
+            return [
+                point
+                for point in display_endpoints.get(plane, [])
+                if self._is_valid_point(point)
+            ]
+        return []
 
     def _is_valid_point(self, point: tuple[float, float]) -> bool:
         return all(math.isfinite(value) and abs(value) < 1.0e6 for value in point)

@@ -7,7 +7,14 @@ from figures.event_display.styles import PARTICLE_STYLES
 
 
 class LegendRenderer:
-    def draw_particle_legend(self, ax, particle_ids, include_vertex: bool = True, title: str | None = None) -> None:
+    def draw_particle_legend(
+        self,
+        ax,
+        particle_ids,
+        include_vertex: bool = True,
+        include_endpoint: bool = False,
+        title: str | None = None,
+    ) -> None:
         handles = []
         for particle_id in sorted(set(particle_ids), key=str):
             style = PARTICLE_STYLES.get(particle_id, PARTICLE_STYLES["default"])
@@ -22,6 +29,19 @@ class LegendRenderer:
                 )
             )
 
+        if include_endpoint:
+            handles.append(
+                Line2D(
+                    [0],
+                    [0],
+                    marker="+",
+                    color="black",
+                    linestyle="None",
+                    markersize=10.0,
+                    markeredgewidth=2.0,
+                    label="endpoint",
+                )
+            )
         if include_vertex:
             handles.append(
                 Line2D(

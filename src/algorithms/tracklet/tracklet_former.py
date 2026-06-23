@@ -15,18 +15,20 @@ class TrackletFormer(ABC):
     @abstractmethod
     def form_tracklets(
         self,
-        reco_entry: Any,
+        event_entry: Any,
         geo: Any,
         storage: Optional[Any] = None,
-        truth_entry: Optional[Any] = None,
+        reference_truth_entry: Optional[Any] = None,
     ) -> tuple[List[Tracklet], dict]:
         """
         Forms a list of Tracklet objects from loaded Reco RNTuple collections.
 
         Args:
-            reco_entry: Dict with loaded reconstructed `patterns`, `tracklets`, and `hits`.
+            event_entry: Dict with loaded `patterns`, `tracklets`, and `hits` for the
+                active reconstruction view selected by the input stage.
             geo: The `GeoHeader` object from the same ROOT file, used for geometry lookups.
-            truth_entry: Optional dict with loaded truth-guided collections.
+            reference_truth_entry: Optional dict with loaded truth-guided collections,
+                available to algorithms that want to compare against truth.
 
         Returns:
             A list of Tracklet objects for the given event.

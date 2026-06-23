@@ -29,7 +29,7 @@ class EventDisplayConfig:
     show_energy_panel: bool = True
     show_tracklets: bool = True
     show_tracklet_labels: bool = False
-    show_endpoint_labels: bool = True
+    show_endpoint_labels: bool = False
     show_start_endpoint_labels: bool = False
     show_vertices: bool = True
     show_patterns: bool = False

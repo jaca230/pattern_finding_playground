@@ -1,7 +1,13 @@
+from algorithms.registry import register_algorithm
 from algorithms.validation.event_validator import EventValidator
 from models.event import Event
 from typing import List, Optional, Any
 
+@register_algorithm(
+    "validation",
+    name="tracklet_grouping",
+    description="Check that reconstructed pattern tracklet groupings match the stored truth grouping.",
+)
 class TrackletGroupingValidator(EventValidator):
     def __init__(self, verbose: int = 0):
         self.verbose = verbose

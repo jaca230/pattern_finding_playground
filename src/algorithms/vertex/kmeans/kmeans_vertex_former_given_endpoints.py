@@ -1,10 +1,16 @@
 import numpy as np
 import random
 from sklearn.cluster import DBSCAN
+from algorithms.registry import register_algorithm
+from algorithms.vertex.kmeans.kmeans_vertex_former import KMeansVertexFormer
 from models.point_3d import Point3D
-from algorithms.vertex.kmeans_vertex_former import KMeansVertexFormer
 from models.tracklet import Tracklet
 
+@register_algorithm(
+    "vertex",
+    name="kmeans_given_endpoints",
+    description="K-means vertexing variant that uses precomputed tracklet endpoints directly.",
+)
 class KMeansVertexFormerGivenEndpoints(KMeansVertexFormer):
     def determine_endpoints(self, tracklet: Tracklet) -> tuple[Point3D, Point3D]:
         return tracklet.get_endpoints()

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 import math
 
+from algorithms.registry import register_algorithm
 from algorithms.vertex.vertex_former import VertexFormer
 from models.tracklet import Tracklet
 from models.vertex import Vertex
@@ -17,7 +18,12 @@ class _FitEndpoint:
     linear_heading: tuple[float, float, float]
 
 
-class PFOverlapVertexFormer(VertexFormer):
+@register_algorithm(
+    "vertex",
+    name="overlap",
+    description="Match fitted tracklet endpoints by projected overlap, with a fallback closest-approach repair.",
+)
+class OverlapVertexFormer(VertexFormer):
     """Python analogue of Reco's PFOverlapVertexFormer.
 
     This follows Sean's current C++ default vertexing rule: compare fitted
@@ -35,6 +41,8 @@ class PFOverlapVertexFormer(VertexFormer):
     PION_PID = 211
     POSITRON_PID = -11
     MUON_PID = -13
+    ENDPOINT_Z_MARGIN_MM = 1.0
+    ENDPOINT_COORD_MARGIN_MM = 1.0
 
     def __init__(self, distance_threshold: float = 1.0):
         self.distance_threshold = float(distance_threshold)
@@ -152,8 +160,8 @@ class PFOverlapVertexFormer(VertexFormer):
         return vertex
 
     def _determine_overlap(self, tracklet_1: Tracklet, tracklet_2: Tracklet, orientation: str) -> dict[str, Any]:
-        endpoints_1 = self._fit_endpoints(tracklet_1)
-        endpoints_2 = self._fit_endpoints(tracklet_2)
+        endpoints_1 = self._fit_endpoints(tracklet_1, orientation)
+        endpoints_2 = self._fit_endpoints(tracklet_2, orientation)
         min_distance = math.inf
         closest_1 = None
         closest_2 = None
@@ -246,10 +254,18 @@ class PFOverlapVertexFormer(VertexFormer):
                 "back_overlap_type": self.SINGLE_ENDPOINT,
                 "front_distance": 0.0,
                 "back_distance": 0.0,
-                "front_endpoints": [endpoint],
-                "back_endpoints": [endpoint],
-                "front_vertex_position": endpoint.position,
-                "back_vertex_position": endpoint.position,
+                "front_endpoints": [endpoint] if self._endpoint_matches_orientation(tracklet, endpoint, "xz") else [],
+                "back_endpoints": [endpoint] if self._endpoint_matches_orientation(tracklet, endpoint, "yz") else [],
+                "front_vertex_position": (
+                    self._projected_vertex_position([endpoint], "xz")
+                    if self._endpoint_matches_orientation(tracklet, endpoint, "xz")
+                    else None
+                ),
+                "back_vertex_position": (
+                    self._projected_vertex_position([endpoint], "yz")
+                    if self._endpoint_matches_orientation(tracklet, endpoint, "yz")
+                    else None
+                ),
                 "tracklets_time_ordered": True,
             }
         )
@@ -260,17 +276,25 @@ class PFOverlapVertexFormer(VertexFormer):
         vertex.extra_info["valid"] = False
         return vertex
 
-    def _fit_endpoints(self, tracklet: Tracklet) -> list[_FitEndpoint]:
+    def _fit_endpoints(self, tracklet: Tracklet, orientation: str | None = None) -> list[_FitEndpoint]:
         endpoints: list[_FitEndpoint] = []
         for endpoint in tracklet.extra_info.get("fit_endpoints", []):
-            endpoints.append(
-                _FitEndpoint(
-                    tracklet_id=tracklet.tracklet_id,
-                    endpoint_index=int(endpoint["endpoint_index"]),
-                    position=tuple(endpoint["position"]),
-                    linear_heading=tuple(endpoint["linear_heading"]),
-                )
+            fit_endpoint = _FitEndpoint(
+                tracklet_id=tracklet.tracklet_id,
+                endpoint_index=int(endpoint["endpoint_index"]),
+                position=tuple(endpoint["position"]),
+                linear_heading=tuple(endpoint["linear_heading"]),
             )
+            if orientation is None:
+                if (
+                    self._endpoint_matches_orientation(tracklet, fit_endpoint, "xz")
+                    or self._endpoint_matches_orientation(tracklet, fit_endpoint, "yz")
+                ):
+                    endpoints.append(fit_endpoint)
+                continue
+
+            if self._endpoint_matches_orientation(tracklet, fit_endpoint, orientation):
+                endpoints.append(fit_endpoint)
         return endpoints
 
     def _set_overlap_endpoint_info(
@@ -285,7 +309,8 @@ class PFOverlapVertexFormer(VertexFormer):
         endpoints = [overlap["endpoint_1"], overlap["endpoint_2"]]
         endpoints = [endpoint for endpoint in endpoints if endpoint is not None]
         vertex.extra_info[f"{vertex_side}_endpoints"] = endpoints
-        vertex.extra_info[f"{vertex_side}_vertex_position"] = self._mean_position(endpoints)
+        orientation = "xz" if vertex_side == "front" else "yz"
+        vertex.extra_info[f"{vertex_side}_vertex_position"] = self._projected_vertex_position(endpoints, orientation)
 
     def _remove_vertex_endpoints(self, all_endpoints: set[_FitEndpoint], vertex: Vertex) -> None:
         for endpoint in vertex.extra_info.get("front_endpoints", []):
@@ -332,6 +357,68 @@ class PFOverlapVertexFormer(VertexFormer):
             sum(endpoint.position[1] for endpoint in endpoints) * scale,
             sum(endpoint.position[2] for endpoint in endpoints) * scale,
         )
+
+    def _projected_vertex_position(
+        self,
+        endpoints: list[_FitEndpoint],
+        orientation: str,
+    ) -> tuple[float, float, float] | None:
+        if not endpoints:
+            return None
+        scale = 1.0 / len(endpoints)
+        mean_z = sum(endpoint.position[2] for endpoint in endpoints) * scale
+        if orientation == "xz":
+            mean_coord = sum(endpoint.position[0] for endpoint in endpoints) * scale
+            return (mean_coord, 0.0, mean_z)
+        if orientation == "yz":
+            mean_coord = sum(endpoint.position[1] for endpoint in endpoints) * scale
+            return (0.0, mean_coord, mean_z)
+        raise ValueError(f"Unknown orientation: {orientation}")
+
+    def _endpoint_matches_orientation(
+        self,
+        tracklet: Tracklet,
+        endpoint: _FitEndpoint,
+        orientation: str,
+    ) -> bool:
+        z_value = endpoint.position[2]
+        coord_value = endpoint.position[0] if orientation == "xz" else endpoint.position[1]
+        if not self._is_display_coordinate(z_value) or not self._is_display_coordinate(coord_value):
+            return False
+
+        z_bounds, coord_bounds = self._projected_hit_bounds(tracklet, orientation)
+        if z_bounds is None or coord_bounds is None:
+            return False
+
+        z_low, z_high = z_bounds
+        coord_low, coord_high = coord_bounds
+        return (
+            z_low - self.ENDPOINT_Z_MARGIN_MM <= z_value <= z_high + self.ENDPOINT_Z_MARGIN_MM
+            and coord_low - self.ENDPOINT_COORD_MARGIN_MM <= coord_value <= coord_high + self.ENDPOINT_COORD_MARGIN_MM
+        )
+
+    def _projected_hit_bounds(
+        self,
+        tracklet: Tracklet,
+        orientation: str,
+    ) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
+        expected_side = "front" if orientation == "xz" else "back"
+        z_values = []
+        coord_values = []
+        for hit in tracklet.hits:
+            if hit.detector_side != expected_side or hit.z is None:
+                continue
+            coord = hit.x if orientation == "xz" else hit.y
+            if coord is None:
+                continue
+            z_values.append(float(hit.z))
+            coord_values.append(float(coord))
+        if not z_values or not coord_values:
+            return None, None
+        return (min(z_values), max(z_values)), (min(coord_values), max(coord_values))
+
+    def _is_display_coordinate(self, value: float) -> bool:
+        return math.isfinite(value) and abs(value) < 1.0e6
 
     def _distance(self, first: tuple[float, float, float], second: tuple[float, float, float]) -> float:
         return math.sqrt(sum(component * component for component in self._subtract(first, second)))

@@ -1,17 +1,23 @@
 from typing import List, Any, Optional
 from collections import Counter
+from algorithms.registry import register_algorithm
 from models.tracklet import Tracklet
 from models.hit import Hit
 from algorithms.tracklet.tracklet_former import TrackletFormer
 
 
+@register_algorithm(
+    "tracklet",
+    name="known_patterns",
+    description="Build tracklets by following existing reconstructed pattern membership from the input file.",
+)
 class KnownPatternsTrackletFormer(TrackletFormer):
     def form_tracklets(
         self,
-        reco_entry: Any,
+        event_entry: Any,
         geo: Any,
         storage: Optional[Any] = None,
-        truth_entry: Optional[Any] = None,
+        reference_truth_entry: Optional[Any] = None,
     ) -> tuple[List[Tracklet], dict]:
         tracklets = []
         patterns_reco = {}
@@ -19,18 +25,18 @@ class KnownPatternsTrackletFormer(TrackletFormer):
         tracklet_counter = 0
 
         # First loop: build analysis tracklets from reconstructed pattern membership.
-        for pattern_idx, pattern in enumerate(reco_entry["patterns"]):
+        for pattern_idx, pattern in enumerate(event_entry["patterns"]):
             indices = pattern.GetTrackletIndices()
             pattern_tracklet_ids = []
 
             for idx in indices:
                 idx = int(idx)
-                raw_tracklet = reco_entry["tracklets"][idx]
+                raw_tracklet = event_entry["tracklets"][idx]
                 particle_id = int(raw_tracklet.GetPID())
                 e_id = int(raw_tracklet.GetEID())
                 hits = []
 
-                for hit in self._root_tracklet_hits(raw_tracklet, reco_entry["hits"]):
+                for hit in self._root_tracklet_hits(raw_tracklet, event_entry["hits"]):
                     vid = hit.GetVID()
                     vname = geo.GetVolumeName(vid).Data()
 
@@ -73,7 +79,7 @@ class KnownPatternsTrackletFormer(TrackletFormer):
 
             patterns_reco[pattern_idx] = pattern_tracklet_ids
 
-        truth_source = truth_entry if truth_entry is not None else reco_entry
+        truth_source = reference_truth_entry if reference_truth_entry is not None else event_entry
 
         n_patterns_truth = 0
         particles_counter = Counter()

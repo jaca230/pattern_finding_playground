@@ -1,6 +1,5 @@
 from typing import Optional, Set, Any, Tuple, List
-from models.tracklet import Tracklet
-from models.vertex import Vertex
+from algorithms.registry import register_algorithm
 from algorithms.vertex.type_scoring.vertex_types import (
     MuonPositronVertex,
     PionMuonVertex,
@@ -8,8 +7,15 @@ from algorithms.vertex.type_scoring.vertex_types import (
     VertexType,
 )
 from algorithms.vertex.vertex_former import VertexFormer
+from models.tracklet import Tracklet
+from models.vertex import Vertex
 
 
+@register_algorithm(
+    "vertex",
+    name="type_scoring",
+    description="Score allowed vertex particle hypotheses and keep the best-scoring vertex for each seed tracklet.",
+)
 class TypeScoringVertexFormer(VertexFormer):
     def __init__(self, vertex_types: Optional[List[VertexType]] = None):
         self.vertex_types = vertex_types or self._default_vertex_types()

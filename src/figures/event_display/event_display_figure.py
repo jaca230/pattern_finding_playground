@@ -88,6 +88,7 @@ class EventDisplayFigure(PlotFigure):
             axes[0],
             [hit.particle_id for hit in all_hits],
             include_vertex=True,
+            include_endpoint=True,
             title="hits",
         )
 
@@ -215,12 +216,8 @@ class EventDisplayFigure(PlotFigure):
             coord_values.extend([glyph.rectangle.coord_min, glyph.rectangle.coord_max])
 
         for tracklet in tracklets:
-            ep0, ep1 = tracklet.get_endpoints()
-            for endpoint in (ep0, ep1):
-                if not endpoint:
-                    continue
-                z, coord = (endpoint.z, endpoint.x) if plane == "xz" else (endpoint.z, endpoint.y)
-                if self._finite_display_value(z) and self._finite_display_value(coord):
+            for _, coord in self._display_endpoints_for_tracklet(tracklet, plane):
+                if self._finite_display_value(coord):
                     coord_values.append(coord)
 
         position_key = "front_vertex_position" if plane == "xz" else "back_vertex_position"
@@ -253,10 +250,9 @@ class EventDisplayFigure(PlotFigure):
                 z_values.append(hit.z)
 
         for tracklet in tracklets:
-            ep0, ep1 = tracklet.get_endpoints()
-            for endpoint in (ep0, ep1):
-                if endpoint and self._finite_display_value(endpoint.z):
-                    z_values.append(endpoint.z)
+            for z, _ in self._display_endpoints_for_tracklet(tracklet, "xz"):
+                if self._finite_display_value(z):
+                    z_values.append(z)
 
         for vertex in vertices:
             for key in ("front_vertex_position", "back_vertex_position"):
@@ -279,3 +275,13 @@ class EventDisplayFigure(PlotFigure):
 
     def _finite_display_value(self, value) -> bool:
         return value is not None and math.isfinite(float(value)) and abs(float(value)) < 1.0e6
+
+    def _display_endpoints_for_tracklet(self, tracklet, plane: str) -> list[tuple[float, float]]:
+        display_endpoints = tracklet.extra_info.get("display_endpoints")
+        if isinstance(display_endpoints, dict):
+            return [
+                point
+                for point in display_endpoints.get(plane, [])
+                if self._finite_display_value(point[0]) and self._finite_display_value(point[1])
+            ]
+        return []

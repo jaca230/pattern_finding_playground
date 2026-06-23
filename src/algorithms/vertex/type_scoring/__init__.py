@@ -1,3 +1,4 @@
+from .type_scoring_vertex_former import TypeScoringVertexFormer
 from .vertex_types import (
     VertexType,
     MuonPositronVertex,
@@ -7,6 +8,7 @@ from .vertex_types import (
 from .vertex_scorers import DistanceScorer, DummyScorer, VertexScorer
 
 __all__ = [
+    "TypeScoringVertexFormer",
     "VertexType",
     "MuonPositronVertex",
     "PionMuonVertex",

@@ -1,9 +1,15 @@
 from typing import Set, Optional, Any
+from algorithms.registry import register_algorithm
 from models.pattern import Pattern
 from models.vertex import Vertex
 from algorithms.pattern.pattern_former import PatternFormer
 
 
+@register_algorithm(
+    "pattern",
+    name="known_patterns",
+    description="Rebuild patterns from the input tracklets' stored reconstructed pattern IDs.",
+)
 class KnownPatternsPatternFormer(PatternFormer):
     def __init__(self):
         """KnownPatternsPatternFormer forms patterns based on the 'pattern_reco' information stored in the tracklet's extra_info."""

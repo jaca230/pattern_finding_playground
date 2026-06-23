@@ -1,10 +1,16 @@
 from typing import Set, Any, Optional, Tuple
 import numpy as np
 
+from algorithms.registry import register_algorithm
 from models.tracklet import Tracklet
 from models.vertex import Vertex
 from algorithms.vertex.vertex_former import VertexFormer  # adjust import path as needed
 
+@register_algorithm(
+    "vertex",
+    name="known_patterns",
+    description="Create one display vertex per tracklet using the tracklet's hit positions.",
+)
 class KnownPatternsVertexFormer(VertexFormer):
     def form_vertices(self, tracklets: Set[Tracklet], storage: Optional[Any] = None) -> Tuple[Set[Vertex], dict]:
         # Initialize an empty set to hold the vertices

@@ -20,6 +20,7 @@ class DetectorEventViewFigure(PlotFigure):
     def __init__(self, config: EventDisplayConfig | None = None, show: bool = True):
         super().__init__(show=show)
         self.config = config or EventDisplayConfig()
+        self.config.hit_edge_color = "black"
         self.hit_renderer = HitRenderer()
         self.legend_renderer = LegendRenderer()
 
@@ -59,7 +60,7 @@ class DetectorEventViewFigure(PlotFigure):
         ax.set_ylabel(coord_label)
         self._set_spatial_limits(ax, glyphs, z_limits)
         self.hit_renderer.draw_layer_guides(ax, projector.guide_rectangles(glyphs, plane), self.config)
-        self.hit_renderer.draw_energy_spatial_hits(ax, glyphs, energy_style, self.config, draw_outline=False)
+        self.hit_renderer.draw_energy_spatial_hits(ax, glyphs, energy_style, self.config, draw_outline=True)
         ax.grid(alpha=0.18)
 
     def _draw_time_panel(self, ax, hits, energy_style, z_limits):
