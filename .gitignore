@@ -17,6 +17,7 @@ __pycache__/
 .artifacts/notebook_smoke/
 .artifacts/.ipynb_checkpoints/
 .artifacts/__pycache__/
+.artifacts/
 
 # Ignore environment directories
 env/
